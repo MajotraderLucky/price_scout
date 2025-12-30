@@ -1,0 +1,48 @@
+# Rust
+/target/
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+*.profraw
+*.profdata
+coverage/
+
+# Debug
+debug/
+*.pdb
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Redis dump
+dump.rdb
+
+# Python (for prototype scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.venv/
