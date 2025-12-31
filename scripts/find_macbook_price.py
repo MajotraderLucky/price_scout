@@ -32,21 +32,19 @@ class Product:
         return f"{self.article} купить цена"
 
     def get_verification_patterns(self) -> dict:
-        """Паттерны для верификации товара"""
+        """Паттерны для верификации товара (case-insensitive)"""
         return {
-            "article": [self.article],
+            "article": [self.article.lower()],
             "ram": [
-                f"{self.ram_gb}GB", f"{self.ram_gb} GB",
-                f"{self.ram_gb}ГБ", f"{self.ram_gb} ГБ",
+                f"{self.ram_gb}gb", f"{self.ram_gb} gb",
+                f"{self.ram_gb}гб", f"{self.ram_gb} гб",
                 f"{self.ram_gb * 1024}",  # 32768 для 32GB
-                f"{self.ram_gb * 1024} Mb",
             ],
             "ssd": [
-                f"{self.ssd_gb}GB", f"{self.ssd_gb} GB",
-                f"{self.ssd_gb}ГБ", f"{self.ssd_gb} ГБ",
-                f"{self.ssd_gb} Gb SSD",
+                f"{self.ssd_gb}gb", f"{self.ssd_gb} gb",
+                f"{self.ssd_gb}гб", f"{self.ssd_gb} гб",
             ],
-            "cpu": [self.cpu, self.cpu.replace(" ", "")],
+            "cpu": [self.cpu.lower(), self.cpu.lower().replace(" ", "")],
         }
 
 
@@ -117,6 +115,11 @@ TARGET = Product(
     cpu="M1 Pro",
 )
 
+# Известные рабочие URL (проверяются в первую очередь)
+KNOWN_URLS = [
+    "https://i-ray.ru/macbook/macbook-pro-16-m1-2021/10498",
+]
+
 
 def search_product(product: Product) -> List[dict]:
     """Поиск по артикулу через DuckDuckGo"""
@@ -174,10 +177,10 @@ def is_product_page(html: str, title: str) -> bool:
 
 
 def verify_product(html: str, title: str, product: Product) -> VerificationResult:
-    """Верификация товара на странице"""
+    """Верификация товара на странице (case-insensitive)"""
 
     patterns = product.get_verification_patterns()
-    content = html + " " + title  # Проверяем и в title тоже
+    content = (html + " " + title).lower()  # Case-insensitive
 
     # Проверка типа страницы
     is_product = is_product_page(html, title)
@@ -344,15 +347,20 @@ def main():
     # Фильтрация - пропускаем маркетплейсы с CAPTCHA
     blocked_domains = ['yandex', 'ozon.ru', 'wildberries', 'avito', 'aliexpress']
 
-    urls_to_check = []
+    # Начинаем с известных рабочих URL
+    urls_to_check = list(KNOWN_URLS)
+    print(f"\n[ИЗВЕСТНЫЕ] Добавлено {len(KNOWN_URLS)} проверенных источников")
+
+    # Добавляем URL из поиска
     for r in results:
         url = r.get('href', '')
         if any(x in url for x in blocked_domains):
             continue
         if TARGET.article.lower() in url.lower():
-            urls_to_check.append(url)
+            if url not in urls_to_check:
+                urls_to_check.append(url)
 
-    print(f"\n[ФИЛЬТР] URL с артикулом (без маркетплейсов): {len(urls_to_check)}")
+    print(f"[ФИЛЬТР] URL с артикулом (без маркетплейсов): {len(urls_to_check)}")
 
     # Шаг 2: Проверка каждого URL с верификацией
     print("\n" + "=" * 70)
