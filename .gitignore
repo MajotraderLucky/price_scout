@@ -29,6 +29,8 @@ coverage/
 
 # Debug
 debug/
+debug_*.html
+debug_*.png
 *.pdb
 
 # Temporary files

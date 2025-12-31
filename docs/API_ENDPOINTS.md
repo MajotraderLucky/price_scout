@@ -71,9 +71,60 @@ E-katalog.ru блокирует запросы с серверных IP-адре
 
 ---
 
+---
+
+## Citilink
+
+### Статус: CAPTCHA REQUIRED
+
+| Параметр            | Значение                                          |
+|---------------------|---------------------------------------------------|
+| HTTP Status         | 429 (Too Many Requests)                           |
+| Framework           | Next.js (React SSR)                               |
+| Данные              | JSON в `__NEXT_DATA__`                            |
+| Защита              | CAPTCHA + Rate Limiting                           |
+| isCaptchaRequired   | true                                              |
+| isBlockedByDelay    | true                                              |
+
+### Структура данных (Next.js)
+
+```javascript
+// Продукты находятся в:
+props.initialState.subcategory.productsFilter.payload.productsFilter.products
+
+// Информация об авторизации:
+props.initialState.authModule.auth.isCaptchaRequired
+props.initialState.authModule.auth.isBlockedByDelay
+```
+
+### Вывод
+
+Citilink возвращает пустой массив продуктов при активной CAPTCHA. Для обхода нужно:
+1. Решить CAPTCHA (2Captcha/Anti-Captcha)
+2. Использовать сессионные cookies
+3. Эмулировать поведение пользователя
+
+---
+
+## DNS-Shop
+
+### Статус: BLOCKED (401)
+
+| Параметр            | Значение                                          |
+|---------------------|---------------------------------------------------|
+| HTTP Status         | 401 Unauthorized                                  |
+| Защита              | Серверная проверка ботов                          |
+| Playwright          | Не помогает                                       |
+
+### Вывод
+
+DNS использует продвинутую защиту, которая блокирует даже headless браузеры.
+
+---
+
 ## Логи тестирования
 
-### 2025-12-31 - Первичная диагностика
+### 2025-12-31 - Playwright тесты
 
 ```
 $ ping -c 3 e-katalog.ru
