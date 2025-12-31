@@ -1,78 +1,118 @@
 # Price Scout
 
-**Разведчик цен** - Telegram-бот для мониторинга и сравнения цен на товары с различных маркетплейсов и интернет-магазинов.
+**Разведчик цен** - система мониторинга и сравнения цен на товары с различных интернет-магазинов.
 
-## Описание
+## Текущий статус
 
-Price Scout парсит ценовой агрегатор E-katalog.ru, который уже собирает цены из сотен магазинов (Wildberries, Ozon, DNS, М.Видео и др.), и предоставляет удобный интерфейс через Telegram-бот.
+**Фаза:** MVP / Исследование
+**Подход:** Python + Web Scraping через поисковики
+
+## Архитектура
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         PRICE SCOUT                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [1] ПОИСК                    [2] ПАРСИНГ                          │
+│  ┌─────────────────┐          ┌─────────────────┐                  │
+│  │ DuckDuckGo API  │ ──────>  │ Playwright      │                  │
+│  │ (по артикулу)   │          │ (JS рендеринг)  │                  │
+│  └─────────────────┘          └─────────────────┘                  │
+│           │                            │                           │
+│           v                            v                           │
+│  ┌─────────────────┐          ┌─────────────────┐                  │
+│  │ Список URL      │          │ HTML парсинг    │                  │
+│  │ магазинов       │          │ (BeautifulSoup) │                  │
+│  └─────────────────┘          └─────────────────┘                  │
+│                                        │                           │
+│  [3] ВЕРИФИКАЦИЯ                       v                           │
+│  ┌─────────────────┐          ┌─────────────────┐                  │
+│  │ Проверка:       │          │ Извлечение:     │                  │
+│  │ - Артикул       │ <──────  │ - Цена          │                  │
+│  │ - RAM/SSD/CPU   │          │ - Наличие       │                  │
+│  │ - Тип страницы  │          │ - Schema.org    │                  │
+│  └─────────────────┘          └─────────────────┘                  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ## Возможности
 
-- Поиск товаров по названию
-- Сравнение цен в разных магазинах
-- Отслеживание изменения цен
-- Уведомления о снижении цены
-- История цен
+- Поиск товаров по артикулу через DuckDuckGo
+- Парсинг магазинов с JS-рендерингом (Playwright)
+- Верификация товара (5-point check: артикул, RAM, SSD, CPU, тип страницы)
+- Извлечение цен из Schema.org/JSON-LD и HTML
+- Определение наличия товара
+- Интеграция 2Captcha для обхода защиты
 
 ## Технологический стек
 
-- **Язык:** Rust 1.83+
-- **Web Framework:** Axum
-- **Telegram:** teloxide
-- **База данных:** PostgreSQL + Redis
-- **Парсинг:** scraper + chromiumoxide
+| Компонент       | Технология               | Статус      |
+|-----------------|--------------------------|-------------|
+| Поиск           | duckduckgo-search        | [+] Working |
+| Браузер         | Playwright + Chromium    | [+] Working |
+| Парсинг HTML    | BeautifulSoup + lxml     | [+] Working |
+| CAPTCHA solving | 2captcha-python          | [+] Ready   |
+| HTTP клиент     | requests                 | [+] Working |
 
 ## Быстрый старт
-
-### Требования
-
-- Rust 1.83+
-- PostgreSQL 16+
-- Redis 7+
-- Docker (опционально)
-
-### Установка
 
 ```bash
 # Клонирование
 git clone <repo-url>
 cd price_scout
 
-# Копирование конфигурации
-cp .env.example .env
-# Отредактируйте .env и укажите TELEGRAM_BOT_TOKEN
+# Создание виртуального окружения
+python3 -m venv venv
+source venv/bin/activate
 
-# Сборка
-cargo build --release
+# Установка зависимостей
+pip install duckduckgo-search playwright beautifulsoup4 lxml requests 2captcha-python
 
-# Запуск
-./target/release/price_scout
+# Установка браузера
+playwright install chromium
+
+# Запуск поиска
+python scripts/find_macbook_price.py
 ```
 
-### Docker
+## Скрипты
 
-```bash
-docker-compose up -d
-```
+| Скрипт                   | Описание                           |
+|--------------------------|------------------------------------|
+| find_macbook_price.py    | Полный pipeline с верификацией     |
+| search_macbook.py        | Поиск по артикулу через DuckDuckGo |
+| check_url.py             | Проверка URL (HTTP)                |
+| check_url_playwright.py  | Проверка URL (Playwright)          |
+| test_captcha_solver.py   | Интеграция 2Captcha                |
 
-## Команды бота
+## Результаты исследования
 
-| Команда           | Описание                                   |
-|-------------------|--------------------------------------------|
-| /start            | Приветствие и справка                      |
-| /search <query>   | Поиск товара по названию                   |
-| /prices <id>      | Цены на товар в разных магазинах           |
-| /track <id>       | Добавить товар в отслеживание              |
-| /list             | Список отслеживаемых товаров               |
-| /remove <id>      | Удалить из отслеживания                    |
-| /help             | Справка                                    |
+| Источник     | Метод      | Статус      | Проблема             |
+|--------------|------------|-------------|----------------------|
+| DuckDuckGo   | HTTP API   | [+] OK      | -                    |
+| E-katalog.ru | HTTP       | [X] Blocked | IP блокировка        |
+| DNS-Shop     | Playwright | [X] 401     | Bot detection        |
+| Citilink     | Playwright | [X] 429     | CAPTCHA + Rate limit |
+| KNS.ru       | Playwright | [+] OK      | -                    |
+| centrsvyazi  | Playwright | [+] OK      | -                    |
 
 ## Документация
 
-- [Roadmap](docs/ROADMAP.md) - План развития
-- [Tech Stack](docs/TECH_STACK.md) - Технологии и архитектура
-- [API Research](docs/API_RESEARCH.md) - Исследование API
-- [Parsing Strategy](docs/PARSING_STRATEGY.md) - Стратегия парсинга
+| Документ              | Описание                   |
+|-----------------------|----------------------------|
+| [Dashboard]           | Kanban доска проекта       |
+| [Learning Path]       | Путь обучения web scraping |
+| [API Endpoints]       | Результаты диагностики API |
+| [Parsing Strategy]    | Стратегия парсинга         |
+| [Roadmap]             | План развития              |
+
+[Dashboard]: PROJECT_DASHBOARD.md
+[Learning Path]: docs/LEARNING_PATH.md
+[API Endpoints]: docs/API_ENDPOINTS.md
+[Parsing Strategy]: docs/PARSING_STRATEGY.md
+[Roadmap]: docs/ROADMAP.md
 
 ## Лицензия
 
