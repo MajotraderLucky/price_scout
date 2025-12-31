@@ -58,6 +58,10 @@
 
 | Скрипт                      | Описание                              | Статус      |
 |-----------------------------|---------------------------------------|-------------|
+| find_macbook_price.py       | Поиск цены с верификацией товара      | [+] Working |
+| search_macbook.py           | Поиск по артикулу через DuckDuckGo    | [+] Working |
+| check_url.py                | Проверка URL (HTTP)                   | [+] Working |
+| check_url_playwright.py     | Проверка URL (Playwright)             | [+] Working |
 | test_search.py              | Поиск через DuckDuckGo                | [+] Working |
 | test_playwright_dns.py      | Парсинг DNS-Shop                      | [X] 401     |
 | test_playwright_citilink.py | Парсинг Citilink                      | [X] CAPTCHA |
@@ -75,7 +79,7 @@
 | Задач In Progress    | 0                  |
 | Задач в Review       | 2                  |
 | Задач Done           | 5                  |
-| Python скриптов      | 4                  |
+| Python скриптов      | 8                  |
 | Документов           | 8                  |
 
 ---
@@ -114,6 +118,8 @@
 
 | Дата       | Изменение                                            |
 |------------|------------------------------------------------------|
+| 2025-12-31 | find_macbook_price.py: верификация товара (5 checks) |
+| 2025-12-31 | Скрипты поиска MacBook по артикулу Z14V0008D         |
 | 2025-12-31 | Добавлена интеграция 2Captcha (PS-9)                 |
 | 2025-12-31 | Тесты Playwright: DNS (401), Citilink (CAPTCHA)      |
 | 2025-12-31 | Создан test_search.py - DuckDuckGo работает          |
