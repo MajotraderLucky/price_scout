@@ -258,49 +258,87 @@ class BrowserScraper:
 
 ### 3.3 Решение CAPTCHA (2Captcha API)
 
-```python
-import time
-import requests
-
-class CaptchaSolver:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.base_url = "http://2captcha.com"
-
-    def solve_recaptcha(self, site_key: str, page_url: str) -> str:
-        """Решить reCAPTCHA v2"""
-
-        # Шаг 1: Отправить задачу
-        resp = requests.post(f"{self.base_url}/in.php", data={
-            "key": self.api_key,
-            "method": "userrecaptcha",
-            "googlekey": site_key,
-            "pageurl": page_url,
-            "json": 1
-        }).json()
-
-        if resp["status"] != 1:
-            raise Exception(f"Error: {resp}")
-
-        task_id = resp["request"]
-
-        # Шаг 2: Ждать решения
-        for _ in range(60):
-            time.sleep(5)
-            resp = requests.get(f"{self.base_url}/res.php", params={
-                "key": self.api_key,
-                "action": "get",
-                "id": task_id,
-                "json": 1
-            }).json()
-
-            if resp["status"] == 1:
-                return resp["request"]  # g-recaptcha-response
-            elif resp["request"] != "CAPCHA_NOT_READY":
-                raise Exception(f"Error: {resp}")
-
-        raise Exception("Timeout waiting for captcha")
+**Установка:**
+```bash
+pip install 2captcha-python playwright
+playwright install chromium
 ```
+
+**Использование:**
+```python
+from twocaptcha import TwoCaptcha
+
+# Инициализация
+solver = TwoCaptcha('YOUR_API_KEY')
+
+# Решение reCAPTCHA v2
+result = solver.recaptcha(
+    sitekey='6Le-wvkSAAAAAPBMRTvw0Q4Muexq9bi0DJwx_mJ-',
+    url='https://example.com/page'
+)
+token = result['code']
+
+# Решение reCAPTCHA v3
+result = solver.recaptcha(
+    sitekey='...',
+    url='https://example.com',
+    version='v3',
+    action='verify',
+    score=0.7
+)
+
+# Решение hCaptcha
+result = solver.hcaptcha(
+    sitekey='...',
+    url='https://example.com'
+)
+```
+
+**Полный пример с Playwright:**
+```python
+from playwright.sync_api import sync_playwright
+from twocaptcha import TwoCaptcha
+
+def scrape_with_captcha(url: str, api_key: str):
+    solver = TwoCaptcha(api_key)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(url)
+
+        # Находим site_key
+        element = page.query_selector('[data-sitekey]')
+        site_key = element.get_attribute('data-sitekey')
+
+        # Решаем CAPTCHA (20-60 сек)
+        result = solver.recaptcha(sitekey=site_key, url=url)
+        token = result['code']
+
+        # Вставляем токен
+        page.evaluate(f'''
+            document.querySelector('[name="g-recaptcha-response"]').value = "{token}";
+        ''')
+
+        # Отправляем форму
+        page.click('button[type="submit"]')
+
+        # Парсим результат
+        # ...
+
+        browser.close()
+```
+
+**Стоимость:**
+
+| Тип CAPTCHA   | Цена за 1000 | Время решения |
+|---------------|--------------|---------------|
+| reCAPTCHA v2  | $2.99        | 20-60 сек     |
+| reCAPTCHA v3  | $2.99        | 20-40 сек     |
+| hCaptcha      | $2.99        | 20-60 сек     |
+| Image CAPTCHA | $0.99        | 5-15 сек      |
+
+**Готовый скрипт:** `scripts/test_captcha_solver.py`
 
 ---
 
