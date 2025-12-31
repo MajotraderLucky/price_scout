@@ -118,6 +118,7 @@ TARGET = Product(
 # Известные рабочие URL (проверяются в первую очередь)
 KNOWN_URLS = [
     "https://i-ray.ru/macbook/macbook-pro-16-m1-2021/10498",
+    "https://www.regard.ru/catalog/tovar421341.htm",  # Stealth bypass
 ]
 
 
