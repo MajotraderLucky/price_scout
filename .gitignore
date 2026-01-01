@@ -48,3 +48,7 @@ __pycache__/
 .Python
 venv/
 .venv/
+
+# Scraped data (temporary)
+data/*.html
+data/*.json

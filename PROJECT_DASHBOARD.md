@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2025-12-31 14:00
+> Последнее обновление: 2025-12-31 17:00
 
 ---
 
@@ -72,6 +72,9 @@
 | test_playwright_dns.py      | Парсинг DNS-Shop                      | [X] 401     |
 | test_playwright_citilink.py | Парсинг Citilink                      | [X] CAPTCHA |
 | test_captcha_solver.py      | Интеграция 2Captcha                   | [+] Ready   |
+| parse_citilink.py           | Citilink парсер (archbook)            | [+] Working |
+| test_dns_uc.py              | DNS undetected-chromedriver           | [X] 403     |
+| test_dns_headful.py         | DNS headful via Xvfb                  | [X] 403     |
 
 ---
 
@@ -85,7 +88,7 @@
 | Задач In Progress    | 0                  |
 | Задач в Review       | 2                  |
 | Задач Done           | 10                 |
-| Python скриптов      | 10                 |
+| Python скриптов      | 13                 |
 | Документов           | 11                 |
 
 ---
@@ -106,18 +109,19 @@
 | Citilink  | [+] OK      | 115,990-208,690 | Stealth + wait_selector  |
 | i-ray.ru  | [+] OK      | 107,999 RUB     | Полная верификация 5/5   |
 | regard.ru | [+] Stealth | 144,400 RUB     | Требует stealth          |
-| DNS-Shop  | [X] 403     | -               | Блокирует все headless   |
+| DNS-Shop  | [X] 403     | -               | IP забанен + Qrator      |
 
-**Вывод:** Citilink сломан! DNS требует headful браузер или 2Captcha
+**Вывод:** Citilink работает! DNS-Shop заблокировал IP archbook (Qrator)
 
 **Текущие рабочие источники:**
 
-| Магазин     | Цена        | Наличие       |
-|-------------|-------------|---------------|
-| centrsvyazi | 103,500 RUB | Неизвестно    |
-| i-ray.ru    | 107,999 RUB | Нет в наличии |
-| regard.ru   | 144,400 RUB | В наличии     |
-| kns.ru      | 156,463 RUB | Нет в наличии |
+| Магазин     | Цена            | Наличие       |
+|-------------|-----------------|---------------|
+| centrsvyazi | 103,500 RUB     | Неизвестно    |
+| i-ray.ru    | 107,999 RUB     | Нет в наличии |
+| Citilink    | 115,990-208,690 | В наличии     |
+| regard.ru   | 144,400 RUB     | В наличии     |
+| kns.ru      | 156,463 RUB     | Нет в наличии |
 
 ---
 
@@ -131,17 +135,19 @@
 | KNS.ru        | Playwright | [+] OK      | URL нестабилен         | Verified         |
 | centrsvyazi   | Playwright | [+] OK      | -                      | Verified         |
 | E-katalog.ru  | HTTP       | [X] Blocked | IP блокировка          | VPN/Proxy/Local  |
-| DNS-Shop      | Playwright | [X] 401     | Bot detection          | Stealth/Proxy    |
-| Citilink      | Playwright | [X] 429     | CAPTCHA + Rate limit   | 2Captcha         |
+| DNS-Shop      | Playwright | [X] 403     | IP banned + Qrator     | Смена IP/Proxy   |
+| Citilink      | Stealth    | [+] OK      | Dynamic loading        | wait_selector    |
 
 ### Найденные цены (MacBook Pro 16 Z14V0008D)
 
 | Магазин       | Цена        | Верификация | Наличие        | Метод   |
 |---------------|-------------|-------------|----------------|---------|
-| i-ray.ru      | 107,999 RUB | 4/4         | Нет в наличии  | Direct  |
-| regard.ru     | 144,400 RUB | 3/4         | В наличии      | Stealth |
 | centrsvyazi   | 103,500 RUB | 5/5         | Неизвестно     | Direct  |
+| i-ray.ru      | 107,999 RUB | 4/4         | Нет в наличии  | Direct  |
+| Citilink      | 115,990 RUB | -           | Да             | Stealth |
+| regard.ru     | 144,400 RUB | 3/4         | В наличии      | Stealth |
 | kns.ru        | 156,463 RUB | 5/5         | Нет в наличии  | Direct  |
+| Citilink max  | 208,690 RUB | -           | Да             | Stealth |
 
 ---
 
@@ -149,7 +155,8 @@
 
 | Дата       | Изменение                                            |
 |------------|------------------------------------------------------|
-| 2025-12-31 | PS-18: Citilink СЛОМАН! 6 цен MacBook получено       |
+| 2025-12-31 | PS-19: DNS-Shop - IP banned + Qrator, нет доступа    |
+| 2025-12-31 | PS-18: Citilink работает! 6 цен MacBook получено     |
 | 2025-12-31 | PS-17: Деплой на Archbook - i-ray.ru работает!       |
 | 2025-12-31 | PS-16: Advanced bypass - серверная защита, не обойти |
 | 2025-12-31 | PS-15: Stealth не обходит Citilink/DNS/Kotofoto      |
