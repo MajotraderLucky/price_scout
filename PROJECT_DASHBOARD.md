@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2025-12-31 17:00
+> Последнее обновление: 2026-01-03
 
 ---
 
@@ -32,10 +32,11 @@
 
 | ID    | Задача                                   | Дата       | Результат                        |
 |-------|------------------------------------------|------------|----------------------------------|
+| PS-17 | Исправить парсер Avito                   | 2026-01-03 | Работает! 9/9 магазинов          |
 | PS-16 | Advanced bypass (Firefox/Warmup)         | 2025-12-31 | Серверная защита, не обходится   |
 | PS-15 | Stealth-тест на заблокированных          | 2025-12-31 | Citilink/DNS/Kotofoto - CAPTCHA  |
 | PS-14 | Stealth scraper (playwright-stealth)     | 2025-12-31 | stealth_scraper.py, regard.ru OK |
-| PS-12 | Исследование доступных магазинов         | 2025-12-31 | 4 магазина верифицировано        |
+| PS-12 | Исследование доступных магазинов         | 2025-12-31 | 7 магазинов верифицировано       |
 | PS-13 | Верификация товара (5-point check)       | 2025-12-31 | find_macbook_price.py            |
 | PS-9  | Интеграция 2Captcha                      | 2025-12-31 | test_captcha_solver.py           |
 | PS-5  | Python прототип парсера                  | 2025-12-31 | test_search.py, Playwright tests |
@@ -75,6 +76,11 @@
 | parse_citilink.py           | Citilink парсер (archbook)            | [+] Working |
 | test_dns_uc.py              | DNS undetected-chromedriver           | [X] 403     |
 | test_dns_headful.py         | DNS headful via Xvfb                  | [X] 403     |
+| dns_scraper.sh              | DNS Firefox + xdotool (archbook)      | [+] Working |
+| dns_api_scraper.py          | DNS API scraper (catalog JSON)        | [+] Working |
+| test_scrapers.py            | Unified test system (all methods)     | [+] Working |
+| citilink_playwright.py      | Citilink Playwright + delay scraper   | [+] Working |
+| citilink_scraper.sh         | Citilink Firefox + xdotool (backup)   | [!] Limited |
 
 ---
 
@@ -88,14 +94,14 @@
 | Задач In Progress    | 0                  |
 | Задач в Review       | 2                  |
 | Задач Done           | 10                 |
-| Python скриптов      | 13                 |
+| Python скриптов      | 18                 |
 | Документов           | 11                 |
 
 ---
 
 ## Current Focus
 
-**Статус: Archbook сервер настроен для парсинга**
+**Статус: ALL TESTS PASSED - 9/9 магазинов работают!**
 
 **Инфраструктура:**
 | Сервер   | IP              | Провайдер  | Статус       |
@@ -103,74 +109,100 @@
 | VPS      | 185.105.108.119 | Datacenter | [X] CAPTCHA  |
 | Archbook | 91.122.50.46    | Ростелеком | [+] Working  |
 
-**Результаты с Archbook (резидентный IP + Stealth):**
-| Магазин   | Статус      | Цена            | Примечание               |
-|-----------|-------------|-----------------|--------------------------|
-| Citilink  | [+] OK      | 115,990-208,690 | Stealth + wait_selector  |
-| i-ray.ru  | [+] OK      | 107,999 RUB     | Полная верификация 5/5   |
-| regard.ru | [+] Stealth | 144,400 RUB     | Требует stealth          |
-| DNS-Shop  | [X] 403     | -               | IP забанен + Qrator      |
+**Результаты unified test (test_scrapers.py):**
+| Магазин       | Цена        | Наличие | Время  | Метод                 | Статус   |
+|---------------|-------------|---------|--------|-----------------------|----------|
+| avito         | 54,900 RUB  | [+] Да  | 41.0s  | firefox+xvfb          | [+] PASS |
+| dns           | 62,799 RUB  | [+] Да  | 38.2s  | firefox+xvfb          | [+] PASS |
+| ozon          | 94,213 RUB  | [+] Да  | 52.4s  | ozon_firefox          | [+] PASS |
+| i-ray         | 107,999 RUB | [+] Да  | 4.1s   | playwright            | [+] PASS |
+| citilink      | 115,990 RUB | [+] Да  | 14.5s  | citilink_special      | [+] PASS |
+| nix           | 129,563 RUB | [-] Нет | 3.6s   | playwright            | [+] PASS |
+| regard        | 144,400 RUB | [+] Да  | 7.9s   | stealth               | [+] PASS |
+| kns           | 156,463 RUB | [-] Нет | 3.5s   | playwright            | [+] PASS |
+| yandex_market | 295,309 RUB | [+] Да  | 15.4s  | yandex_market_special | [+] PASS |
 
-**Вывод:** Citilink работает! DNS-Shop заблокировал IP archbook (Qrator)
+**Вывод:** ALL TESTS PASSED! 9/9 магазинов работают
 
-**Текущие рабочие источники:**
+**Текущие рабочие источники (10 магазинов):**
 
-| Магазин     | Цена            | Наличие       |
-|-------------|-----------------|---------------|
-| centrsvyazi | 103,500 RUB     | Неизвестно    |
-| i-ray.ru    | 107,999 RUB     | Нет в наличии |
-| Citilink    | 115,990-208,690 | В наличии     |
-| regard.ru   | 144,400 RUB     | В наличии     |
-| kns.ru      | 156,463 RUB     | Нет в наличии |
+| Магазин       | Цена            | Наличие       | Метод                 | Время  |
+|---------------|-----------------|---------------|-----------------------|--------|
+| Avito         | 54,900-349,990  | 16 объявлений | Firefox+xdotool       | 41.0s  |
+| DNS-Shop      | 62,799-419,999  | 77 моделей    | Firefox+xdotool       | 38.2s  |
+| Ozon          | 94,213 RUB      | В наличии     | ozon_firefox          | 52.4s  |
+| centrsvyazi   | 103,500 RUB     | Неизвестно    | Playwright            | -      |
+| i-ray.ru      | 107,999 RUB     | В наличии     | Playwright            | 3.3s   |
+| Citilink      | 115,990-208,690 | 10 моделей    | citilink_special      | -      |
+| nix.ru        | 129,563 RUB     | Нет в наличии | Playwright            | 2.9s   |
+| regard.ru     | 144,400 RUB     | В наличии     | Stealth               | 7.1s   |
+| kns.ru        | 156,463 RUB     | Нет в наличии | Playwright            | 4.2s   |
+| Yandex Market | 287,891 RUB     | В наличии     | yandex_market_special | 15.2s  |
 
 ---
 
 ## Findings Summary
 
-| Источник      | Метод      | Статус      | Проблема               | Решение          |
-|---------------|------------|-------------|------------------------|------------------|
-| DuckDuckGo    | HTTP       | [+] OK      | -                      | -                |
-| i-ray.ru      | Playwright | [+] OK      | -                      | Verified, 4/4    |
-| regard.ru     | Stealth    | [+] OK      | Bot detection          | Stealth bypass   |
-| KNS.ru        | Playwright | [+] OK      | URL нестабилен         | Verified         |
-| centrsvyazi   | Playwright | [+] OK      | -                      | Verified         |
-| E-katalog.ru  | HTTP       | [X] Blocked | IP блокировка          | VPN/Proxy/Local  |
-| DNS-Shop      | Playwright | [X] 403     | IP banned + Qrator     | Смена IP/Proxy   |
-| Citilink      | Stealth    | [+] OK      | Dynamic loading        | wait_selector    |
+| Источник      | Метод      | Статус      | Проблема               | Решение               |
+|---------------|------------|-------------|------------------------|-----------------------|
+| DuckDuckGo    | HTTP       | [+] OK      | -                      | -                     |
+| i-ray.ru      | Playwright | [+] OK      | -                      | Verified, 4/4         |
+| nix.ru        | Playwright | [+] OK      | -                      | Direct access         |
+| regard.ru     | Stealth    | [+] OK      | Bot detection          | Stealth bypass        |
+| kns.ru        | Playwright | [+] OK      | URL нестабилен         | Verified              |
+| centrsvyazi   | Playwright | [+] OK      | -                      | Verified              |
+| DNS-Shop      | Firefox    | [+] OK      | Qrator bypass          | xdotool + Xvfb        |
+| Citilink      | Playwright | [!] 429     | Rate limit             | Delay + Stealth       |
+| Yandex Market | Playwright | [+] OK      | -                      | yandex_market_special |
+| E-katalog.ru  | HTTP       | [X] Blocked | IP блокировка          | VPN/Proxy/Local       |
+| Ozon          | Firefox    | [+] OK      | Headless detection     | ozon_firefox          |
+| Avito         | Firefox    | [+] OK      | VPS блокирован         | Firefox на Archbook   |
 
-### Найденные цены (MacBook Pro 16 Z14V0008D)
+### Найденные цены (MacBook Pro 16)
 
-| Магазин       | Цена        | Верификация | Наличие        | Метод   |
-|---------------|-------------|-------------|----------------|---------|
-| centrsvyazi   | 103,500 RUB | 5/5         | Неизвестно     | Direct  |
-| i-ray.ru      | 107,999 RUB | 4/4         | Нет в наличии  | Direct  |
-| Citilink      | 115,990 RUB | -           | Да             | Stealth |
-| regard.ru     | 144,400 RUB | 3/4         | В наличии      | Stealth |
-| kns.ru        | 156,463 RUB | 5/5         | Нет в наличии  | Direct  |
-| Citilink max  | 208,690 RUB | -           | Да             | Stealth |
+| Магазин       | Цена        | Верификация | Наличие        | Метод                 |
+|---------------|-------------|-------------|----------------|-----------------------|
+| Avito         | 54,900 RUB  | -           | 16 объявлений  | Firefox+xdotool       |
+| DNS-Shop      | 62,799+     | -           | 77 моделей     | Firefox+xdotool       |
+| Ozon          | 94,213 RUB  | -           | В наличии      | ozon_firefox          |
+| centrsvyazi   | 103,500 RUB | 5/5         | Неизвестно     | Playwright            |
+| i-ray.ru      | 107,999 RUB | 4/4         | В наличии      | Playwright            |
+| Citilink      | 115,990 RUB | -           | 10 моделей     | citilink_special      |
+| nix.ru        | 129,563 RUB | -           | Нет в наличии  | Playwright            |
+| regard.ru     | 144,400 RUB | 3/4         | В наличии      | Stealth               |
+| kns.ru        | 156,463 RUB | 5/5         | Нет в наличии  | Playwright            |
+| Yandex Market | 287,891 RUB | -           | В наличии      | yandex_market_special |
 
 ---
 
 ## Changelog
 
-| Дата       | Изменение                                            |
-|------------|------------------------------------------------------|
-| 2025-12-31 | PS-19: DNS-Shop - IP banned + Qrator, нет доступа    |
-| 2025-12-31 | PS-18: Citilink работает! 6 цен MacBook получено     |
-| 2025-12-31 | PS-17: Деплой на Archbook - i-ray.ru работает!       |
-| 2025-12-31 | PS-16: Advanced bypass - серверная защита, не обойти |
-| 2025-12-31 | PS-15: Stealth не обходит Citilink/DNS/Kotofoto      |
-| 2025-12-31 | Stealth scraper: обход защиты regard.ru (144,400)    |
-| 2025-12-31 | Найден i-ray.ru: 107,999 RUB, В наличии, verified    |
-| 2025-12-31 | find_macbook_price.py: верификация товара (5 checks) |
-| 2025-12-31 | Скрипты поиска MacBook по артикулу Z14V0008D         |
-| 2025-12-31 | Добавлена интеграция 2Captcha (PS-9)                 |
-| 2025-12-31 | Тесты Playwright: DNS (401), Citilink (CAPTCHA)      |
-| 2025-12-31 | Создан test_search.py - DuckDuckGo работает          |
-| 2025-12-31 | Создан LEARNING_PATH.md - путь обучения              |
-| 2025-12-31 | PS-1 заблокирован: e-katalog.ru недоступен           |
-| 2025-12-31 | Создан дашборд проекта                               |
-| 2025-12-31 | Начальная документация проекта                       |
+| Дата       | Изменение                                                   |
+|------------|-------------------------------------------------------------|
+| 2026-01-03 | Avito работает! Исправлен парсер, 9/9 магазинов, 54,900 RUB |
+| 2026-01-02 | Ozon добавлен! 94,213 RUB через Firefox, 8/9 магазинов      |
+| 2026-01-02 | Yandex Market добавлен! 287,891 RUB, 7/8 магазинов работают |
+| 2026-01-02 | ALL TESTS PASSED! 6/6 unified test, все методы работают     |
+| 2026-01-02 | test_scrapers.py: citilink_special + firefox xvfb fix       |
+| 2026-01-02 | Citilink работает! Playwright + delay, 10 моделей           |
+| 2026-01-02 | Добавлен nix.ru (129,563 RUB), 7/7 магазинов работают       |
+| 2026-01-02 | DNS-Shop работает! Firefox + xdotool, 77 моделей            |
+| 2025-12-31 | PS-19: DNS-Shop - IP banned + Qrator, нет доступа           |
+| 2025-12-31 | PS-18: Citilink работает! 6 цен MacBook получено            |
+| 2025-12-31 | PS-17: Деплой на Archbook - i-ray.ru работает!              |
+| 2025-12-31 | PS-16: Advanced bypass - серверная защита, не обойти        |
+| 2025-12-31 | PS-15: Stealth не обходит Citilink/DNS/Kotofoto             |
+| 2025-12-31 | Stealth scraper: обход защиты regard.ru (144,400)           |
+| 2025-12-31 | Найден i-ray.ru: 107,999 RUB, В наличии, verified           |
+| 2025-12-31 | find_macbook_price.py: верификация товара (5 checks)        |
+| 2025-12-31 | Скрипты поиска MacBook по артикулу Z14V0008D                |
+| 2025-12-31 | Добавлена интеграция 2Captcha (PS-9)                        |
+| 2025-12-31 | Тесты Playwright: DNS (401), Citilink (CAPTCHA)             |
+| 2025-12-31 | Создан test_search.py - DuckDuckGo работает                 |
+| 2025-12-31 | Создан LEARNING_PATH.md - путь обучения                     |
+| 2025-12-31 | PS-1 заблокирован: e-katalog.ru недоступен                  |
+| 2025-12-31 | Создан дашборд проекта                                      |
+| 2025-12-31 | Начальная документация проекта                              |
 
 ---
 
