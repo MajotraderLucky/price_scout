@@ -32,6 +32,7 @@
 
 | ID    | Задача                                   | Дата       | Результат                        |
 |-------|------------------------------------------|------------|----------------------------------|
+| PS-18 | Исправить Citilink rate limiting         | 2026-01-03 | Задержки 90-210s, стабильно      |
 | PS-17 | Исправить парсер Avito                   | 2026-01-03 | Работает! 9/9 магазинов          |
 | PS-16 | Advanced bypass (Firefox/Warmup)         | 2025-12-31 | Серверная защита, не обходится   |
 | PS-15 | Stealth-тест на заблокированных          | 2025-12-31 | Citilink/DNS/Kotofoto - CAPTCHA  |
@@ -93,7 +94,7 @@
 | Задач в Backlog      | 5                  |
 | Задач In Progress    | 0                  |
 | Задач в Review       | 2                  |
-| Задач Done           | 10                 |
+| Задач Done           | 11                 |
 | Python скриптов      | 18                 |
 | Документов           | 11                 |
 
@@ -112,15 +113,15 @@
 **Результаты unified test (test_scrapers.py):**
 | Магазин       | Цена        | Наличие | Время  | Метод                 | Статус   |
 |---------------|-------------|---------|--------|-----------------------|----------|
-| avito         | 54,900 RUB  | [+] Да  | 41.0s  | firefox+xvfb          | [+] PASS |
-| dns           | 62,799 RUB  | [+] Да  | 38.2s  | firefox+xvfb          | [+] PASS |
-| ozon          | 94,213 RUB  | [+] Да  | 52.4s  | ozon_firefox          | [+] PASS |
-| i-ray         | 107,999 RUB | [+] Да  | 4.1s   | playwright            | [+] PASS |
-| citilink      | 115,990 RUB | [+] Да  | 14.5s  | citilink_special      | [+] PASS |
-| nix           | 129,563 RUB | [-] Нет | 3.6s   | playwright            | [+] PASS |
+| avito         | 51,799 RUB  | [+] Да  | 46.4s  | firefox+xvfb          | [+] PASS |
+| dns           | 62,799 RUB  | [+] Да  | 38.3s  | firefox+xvfb          | [+] PASS |
+| ozon          | 75,024 RUB  | [+] Да  | 52.4s  | ozon_firefox          | [+] PASS |
+| i-ray         | 107,999 RUB | [+] Да  | 3.5s   | playwright            | [+] PASS |
+| citilink      | 115,990 RUB | [+] Да  | 24.4s  | citilink_special      | [+] PASS |
+| nix           | 129,563 RUB | [-] Нет | 3.5s   | playwright            | [+] PASS |
 | regard        | 144,400 RUB | [+] Да  | 7.9s   | stealth               | [+] PASS |
-| kns           | 156,463 RUB | [-] Нет | 3.5s   | playwright            | [+] PASS |
-| yandex_market | 295,309 RUB | [+] Да  | 15.4s  | yandex_market_special | [+] PASS |
+| kns           | 156,463 RUB | [-] Нет | 3.3s   | playwright            | [+] PASS |
+| yandex_market | 287,891 RUB | [+] Да  | 16.0s  | yandex_market_special | [+] PASS |
 
 **Вывод:** ALL TESTS PASSED! 9/9 магазинов работают
 
@@ -128,16 +129,16 @@
 
 | Магазин       | Цена            | Наличие       | Метод                 | Время  |
 |---------------|-----------------|---------------|-----------------------|--------|
-| Avito         | 54,900-349,990  | 16 объявлений | Firefox+xdotool       | 41.0s  |
-| DNS-Shop      | 62,799-419,999  | 77 моделей    | Firefox+xdotool       | 38.2s  |
-| Ozon          | 94,213 RUB      | В наличии     | ozon_firefox          | 52.4s  |
+| Avito         | 51,799-349,990  | 16 объявлений | Firefox+xdotool       | 46.4s  |
+| DNS-Shop      | 62,799-419,999  | 77 моделей    | Firefox+xdotool       | 38.3s  |
+| Ozon          | 75,024 RUB      | В наличии     | ozon_firefox          | 52.4s  |
 | centrsvyazi   | 103,500 RUB     | Неизвестно    | Playwright            | -      |
-| i-ray.ru      | 107,999 RUB     | В наличии     | Playwright            | 3.3s   |
-| Citilink      | 115,990-208,690 | 10 моделей    | citilink_special      | -      |
-| nix.ru        | 129,563 RUB     | Нет в наличии | Playwright            | 2.9s   |
-| regard.ru     | 144,400 RUB     | В наличии     | Stealth               | 7.1s   |
-| kns.ru        | 156,463 RUB     | Нет в наличии | Playwright            | 4.2s   |
-| Yandex Market | 287,891 RUB     | В наличии     | yandex_market_special | 15.2s  |
+| i-ray.ru      | 107,999 RUB     | В наличии     | Playwright            | 3.5s   |
+| Citilink      | 115,990 RUB     | В наличии     | citilink_special      | 24.4s  |
+| nix.ru        | 129,563 RUB     | Нет в наличии | Playwright            | 3.5s   |
+| regard.ru     | 144,400 RUB     | В наличии     | Stealth               | 7.9s   |
+| kns.ru        | 156,463 RUB     | Нет в наличии | Playwright            | 3.3s   |
+| Yandex Market | 287,891 RUB     | В наличии     | yandex_market_special | 16.0s  |
 
 ---
 
@@ -152,7 +153,7 @@
 | kns.ru        | Playwright | [+] OK      | URL нестабилен         | Verified              |
 | centrsvyazi   | Playwright | [+] OK      | -                      | Verified              |
 | DNS-Shop      | Firefox    | [+] OK      | Qrator bypass          | xdotool + Xvfb        |
-| Citilink      | Playwright | [!] 429     | Rate limit             | Delay + Stealth       |
+| Citilink      | Playwright | [+] OK      | Rate limit (429)       | Delays 90-210s        |
 | Yandex Market | Playwright | [+] OK      | -                      | yandex_market_special |
 | E-katalog.ru  | HTTP       | [X] Blocked | IP блокировка          | VPN/Proxy/Local       |
 | Ozon          | Firefox    | [+] OK      | Headless detection     | ozon_firefox          |
@@ -162,12 +163,12 @@
 
 | Магазин       | Цена        | Верификация | Наличие        | Метод                 |
 |---------------|-------------|-------------|----------------|-----------------------|
-| Avito         | 54,900 RUB  | -           | 16 объявлений  | Firefox+xdotool       |
+| Avito         | 51,799 RUB  | -           | 16 объявлений  | Firefox+xdotool       |
 | DNS-Shop      | 62,799+     | -           | 77 моделей     | Firefox+xdotool       |
-| Ozon          | 94,213 RUB  | -           | В наличии      | ozon_firefox          |
+| Ozon          | 75,024 RUB  | -           | В наличии      | ozon_firefox          |
 | centrsvyazi   | 103,500 RUB | 5/5         | Неизвестно     | Playwright            |
 | i-ray.ru      | 107,999 RUB | 4/4         | В наличии      | Playwright            |
-| Citilink      | 115,990 RUB | -           | 10 моделей     | citilink_special      |
+| Citilink      | 115,990 RUB | -           | В наличии      | citilink_special      |
 | nix.ru        | 129,563 RUB | -           | Нет в наличии  | Playwright            |
 | regard.ru     | 144,400 RUB | 3/4         | В наличии      | Stealth               |
 | kns.ru        | 156,463 RUB | 5/5         | Нет в наличии  | Playwright            |
@@ -179,8 +180,9 @@
 
 | Дата       | Изменение                                                   |
 |------------|-------------------------------------------------------------|
-| 2026-01-03 | Avito работает! Исправлен парсер, 9/9 магазинов, 54,900 RUB |
-| 2026-01-02 | Ozon добавлен! 94,213 RUB через Firefox, 8/9 магазинов      |
+| 2026-01-03 | Citilink rate limiting исправлен! Задержки 90-210s, 24.4s   |
+| 2026-01-03 | Avito работает! Исправлен парсер, 9/9 магазинов, 51,799 RUB |
+| 2026-01-02 | Ozon добавлен! 75,024 RUB через Firefox, 8/9 магазинов      |
 | 2026-01-02 | Yandex Market добавлен! 287,891 RUB, 7/8 магазинов работают |
 | 2026-01-02 | ALL TESTS PASSED! 6/6 unified test, все методы работают     |
 | 2026-01-02 | test_scrapers.py: citilink_special + firefox xvfb fix       |
