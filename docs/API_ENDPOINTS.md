@@ -168,14 +168,15 @@ elements = page.query_selector_all('[data-auto="price-value"]')
 
 ## Citilink
 
-### Статус: РАБОТАЕТ (Retry при 429)
+### Статус: НЕСТАБИЛЬНЫЙ (Агрессивный Rate Limiting)
 
 | Параметр       | Значение                                              |
 |----------------|-------------------------------------------------------|
 | URL            | https://www.citilink.ru/search/?text=MacBook+Pro+16   |
 | Framework      | Next.js (React SSR)                                   |
-| Защита         | Rate Limiting (429)                                   |
-| Решение        | Retry логика (3 попытки, 30-60 сек задержка)          |
+| Защита         | Агрессивный Rate Limiting (429)                       |
+| Решение        | Retry логика (3 попытки, 90-210 сек задержка)         |
+| Надежность     | 50-70% (зависит от IP репутации)                      |
 
 ### Структура данных (Next.js)
 
@@ -191,6 +192,19 @@ props.pageProps.effectorValues["..."].products[0].isAvailable
 # data-meta-price атрибут
 prices = re.findall(r'data-meta-price="(\d+)"', html)
 ```
+
+### Важно (Rate Limiting)
+
+**При rate limiting:**
+- HTTP 200, но `effectorValues` пустой
+- Товары не загружаются через JavaScript
+- Fallback (data-meta-price) тоже отсутствует
+- Результат: 0 товаров
+
+**Решение:**
+- Увеличенные задержки: 90s, 150s, 210s между попытками
+- Интервал между тестами: минимум 5 минут
+- Firefox метод НЕ помогает (та же проблема)
 
 ---
 

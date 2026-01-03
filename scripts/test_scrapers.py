@@ -103,10 +103,10 @@ STORES: List[StoreConfig] = [
     ),
     StoreConfig(
         name="citilink",
-        method="citilink_special",  # Специальный метод с увеличенной задержкой
+        method="citilink_special",  # Playwright с длительными задержками (rate limiting)
         search_url="https://www.citilink.ru/search/?text=MacBook+Pro+16",
         parser="citilink",
-        delay=8,  # Увеличенная задержка для обхода rate limit
+        delay=8,
     ),
     StoreConfig(
         name="dns",
@@ -316,6 +316,29 @@ def parse_avito_json(json_path: str) -> Optional[Dict]:
     return None
 
 
+def parse_citilink_json(json_path: str) -> Optional[Dict]:
+    """Парсинг Citilink JSON"""
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        products = data.get("products", [])
+        if products:
+            prices = [p["price"] for p in products if p.get("price") and p["price"] > 0]
+            if prices:
+                # Находим товары в наличии
+                available_products = [p for p in products if p.get("available")]
+                return {
+                    "price": min(prices),
+                    "available": len(available_products) > 0,
+                    "count": len(products),
+                }
+    except Exception:
+        pass
+
+    return None
+
+
 def parse_ozon_json(json_path: str) -> Optional[Dict]:
     """Парсинг Ozon JSON"""
     try:
@@ -514,7 +537,7 @@ def test_citilink_special(store: StoreConfig, query: str) -> TestResult:
 
     url = store.search_url  # URL уже полный, без подстановки
     max_retries = 3
-    retry_delay = 30  # секунд между попытками при 429
+    retry_delay = 90  # секунд между попытками при 429 (было 30, увеличено до 90)
 
     for attempt in range(max_retries):
         try:
@@ -545,8 +568,8 @@ def test_citilink_special(store: StoreConfig, query: str) -> TestResult:
                 stealth.apply_stealth_sync(page)
 
                 # Начальная задержка перед запросом (увеличивается с каждой попыткой)
-                initial_delay = 3 + (attempt * 5)
-                random_delay(initial_delay, initial_delay + 3)
+                initial_delay = 10 + (attempt * 10)  # было 3 + (attempt * 5), увеличено
+                random_delay(initial_delay, initial_delay + 5)
 
                 response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 result.details["http_status"] = response.status
@@ -558,7 +581,7 @@ def test_citilink_special(store: StoreConfig, query: str) -> TestResult:
                     if attempt < max_retries - 1:
                         print(f"    [!] 429 Rate Limited, waiting {retry_delay}s before retry...")
                         time.sleep(retry_delay)
-                        retry_delay += 15  # Увеличиваем задержку с каждой попыткой
+                        retry_delay += 60  # Увеличиваем задержку с каждой попыткой (было 15, теперь 60)
                         continue
                     else:
                         result.status = "FAIL"
@@ -771,6 +794,81 @@ def test_avito_firefox(store: StoreConfig, query: str) -> TestResult:
         # Парсим последний файл
         latest = max(json_files, key=lambda x: x.stat().st_mtime)
         parsed = parse_avito_json(str(latest))
+
+        if parsed and parsed.get("price"):
+            result.price = parsed["price"]
+            result.available = parsed.get("available")
+            result.details["products_count"] = parsed.get("count", 0)
+            result.status = "PASS"
+        else:
+            result.status = "FAIL"
+            result.error = "Failed to parse JSON"
+
+    except subprocess.TimeoutExpired:
+        result.status = "FAIL"
+        result.error = f"Timeout ({FIREFOX_TIMEOUT}s)"
+    except Exception as e:
+        result.status = "ERROR"
+        result.error = f"{type(e).__name__}: {str(e)[:50]}"
+
+    result.response_time = time.time() - start_time
+    return result
+
+
+def test_citilink_firefox(store: StoreConfig, query: str) -> TestResult:
+    """Тест через Firefox + xdotool (Citilink)"""
+    start_time = time.time()
+    result = TestResult(store=store.name, method="citilink_firefox", status="ERROR")
+
+    script_path = Path(__file__).parent / "citilink_scraper.sh"
+    output_dir = Path("/tmp/citilink_scraper_test")
+
+    if not script_path.exists():
+        result.status = "SKIP"
+        result.error = "citilink_scraper.sh not found"
+        return result
+
+    try:
+        # Создаём директорию
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Получаем текущее окружение и модифицируем
+        import os
+        env = os.environ.copy()
+        # Удаляем DISPLAY чтобы скрипт сам запустил xvfb-run
+        env.pop("DISPLAY", None)
+        env.pop("XVFB_RUNNING", None)
+
+        # Запускаем скрипт
+        proc = subprocess.run(
+            ["bash", str(script_path), "macbook-pro", str(output_dir)],
+            capture_output=True,
+            text=True,
+            timeout=FIREFOX_TIMEOUT,
+            env=env
+        )
+
+        result.details["returncode"] = proc.returncode
+
+        if proc.returncode != 0:
+            # Проверяем есть ли частичный вывод
+            if "Сохранено:" in proc.stdout or "JSON:" in proc.stdout:
+                pass  # Продолжаем парсить
+            else:
+                result.status = "FAIL"
+                result.error = f"Script failed: {proc.stderr[:100] if proc.stderr else proc.stdout[:100]}"
+                return result
+
+        # Ищем JSON файл
+        json_files = list(output_dir.glob("*.json"))
+        if not json_files:
+            result.status = "FAIL"
+            result.error = "No JSON output"
+            return result
+
+        # Парсим последний файл
+        latest = max(json_files, key=lambda x: x.stat().st_mtime)
+        parsed = parse_citilink_json(str(latest))
 
         if parsed and parsed.get("price"):
             result.price = parsed["price"]
@@ -1012,6 +1110,8 @@ def run_test(store: StoreConfig, query: str) -> TestResult:
         return test_playwright_stealth(store, query)
     elif store.method == "citilink_special":
         return test_citilink_special(store, query)
+    elif store.method == "citilink_firefox":
+        return test_citilink_firefox(store, query)
     elif store.method == "yandex_market_special":
         return test_yandex_market_special(store, query)
     elif store.method == "ozon_firefox":
