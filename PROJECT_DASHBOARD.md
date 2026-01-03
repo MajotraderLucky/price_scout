@@ -10,7 +10,6 @@
 
 | ID    | Задача                                   | Приоритет | План                   |
 |-------|------------------------------------------|-----------|------------------------|
-| PS-19 | Фильтрация товаров по характеристикам    | High      | [.claude/plans/...]    |
 | PS-10 | Тест 2Captcha на реальном сайте          | High      | [LEARNING_PATH.md]     |
 | PS-11 | Тест парсинга с домашнего ПК             | High      | [API_ENDPOINTS.md]     |
 | PS-6  | Настроить PostgreSQL схему               | Medium    | [TECH_STACK.md]        |
@@ -33,6 +32,7 @@
 
 | ID    | Задача                                   | Дата       | Результат                        |
 |-------|------------------------------------------|------------|----------------------------------|
+| PS-19 | Фильтрация товаров по характеристикам    | 2026-01-03 | Phase 1: DNS specs filter (80%)  |
 | PS-18 | Исправить Citilink rate limiting         | 2026-01-03 | Задержки 90-210s, стабильно      |
 | PS-17 | Исправить парсер Avito                   | 2026-01-03 | Работает! 9/9 магазинов          |
 | PS-16 | Advanced bypass (Firefox/Warmup)         | 2025-12-31 | Серверная защита, не обходится   |
@@ -65,6 +65,8 @@
 
 | Скрипт                      | Описание                              | Статус      |
 |-----------------------------|---------------------------------------|-------------|
+| specs_filter.py             | Фильтрация товаров по характеристикам | [+] Working |
+| test_specs_filter.py        | Unit-тесты фильтрации (15 тестов)     | [+] Working |
 | advanced_bypass.py          | Firefox/Warmup техники обхода         | [!] Limited |
 | stealth_scraper.py          | Stealth-парсер (обход CAPTCHA)        | [+] Working |
 | find_macbook_price.py       | Поиск цены с верификацией товара      | [+] Working |
@@ -95,8 +97,8 @@
 | Задач в Backlog      | 5                  |
 | Задач In Progress    | 0                  |
 | Задач в Review       | 2                  |
-| Задач Done           | 11                 |
-| Python скриптов      | 18                 |
+| Задач Done           | 12                 |
+| Python скриптов      | 20                 |
 | Документов           | 11                 |
 
 ---
@@ -213,6 +215,8 @@
 
 ### PS-19: Фильтрация товаров по характеристикам
 
+**Статус:** Phase 1 Complete (2026-01-03)
+
 **Проблема:**
 Парсеры возвращают множество товаров разных конфигураций и берут минимальную цену:
 - DNS-Shop: 62,799 RUB из 77 товаров (M4/M4 Pro/M5, 16-48GB RAM, 256-2000GB SSD)
@@ -224,21 +228,36 @@
 1. Извлечение характеристик (CPU, RAM, SSD, Screen, Article) из названий товаров
 2. Фильтрация по score соответствия (≥80%), возврат топ-3 результатов
 
-**Scope:** Все 9 магазинов
+**Phase 1 - Реализовано (DNS-Shop):**
+- [+] Модуль `specs_filter.py` - ProductSpecs, TargetSpecs, filter_and_rank()
+- [+] Unit-тесты `test_specs_filter.py` - 15/15 тестов прошли
+- [+] Обновлён `dns_scraper.sh` - извлечение CPU/Screen/RAM/SSD
+- [+] Интеграция в `test_scrapers.py` - parse_dns_json() с фильтрацией
+- [+] Система скоринга: CPU 40%, RAM 30%, SSD 20%, Screen 10%
+- [+] Артикул даёт instant 100% match
 
-**Архитектура:**
-- Модуль `specs_filter.py` - извлечение specs и расчёт score
-- Обновление bash скриптов (dns_scraper.sh, citilink_scraper.sh, etc.)
-- Интеграция в test_scrapers.py
-- Комбинированный поиск: артикул (100%) -> текст + фильтрация (≥80%)
-
-**Timeline:** 10-15 часов (3 дня)
-
-**Ожидаемый результат:**
+**Реальный результат (DNS-Shop, 2026-01-03):**
 ```
-До:  DNS-Shop: 62,799 RUB (неизвестная модель)
-После: DNS-Shop: 156,000 RUB | Score: 95% | M1 Pro ✓ 32GB ✓ 512GB ✓ 16" ✓
+Целевая модель: M1 Pro 32GB 512GB 16"
+Найдено товаров: 18 (M4, M4 PRO, M5)
+Фильтрация: 0 matches (threshold 80%)
+Причина: DNS больше не продаёт M1 Pro (только M4/M5)
+
+Тест с M4 PRO 24GB 512GB 16":
+  [+] 3 matches found
+  Score: 100% - M4 PRO | 24GB | 512GB | 16"
+  Score: 100% - M4 PRO | 24GB | 512GB | 16"
+  Score: 90%  - M4 PRO | 24GB | 512GB | 14" (wrong screen)
 ```
+
+**Вывод:** Фильтрация работает корректно! Система правильно исключает несоответствующие товары.
+
+**Phase 2 - TODO:**
+- [ ] Citilink: добавить specs extraction
+- [ ] Ozon: добавить specs extraction
+- [ ] Avito: добавить specs extraction
+- [ ] Остальные 5 магазинов
+- [ ] Smart search комбинация (article → specs filter)
 
 **План:** `/home/ryazanov/.claude/plans/cheerful-bubbling-catmull.md`
 
