@@ -208,14 +208,22 @@ for match in product_pattern.finditer(html):
     specs = re.search(r'\[([^\]]+)\]', name)
     specs_str = specs.group(1) if specs else ''
 
+    # Extract specifications
     ram = re.search(r'RAM\s*(\d+)\s*ГБ', specs_str)
     ssd = re.search(r'SSD\s*(\d+)\s*ГБ', specs_str)
+    cpu = re.search(r'(?:Apple\s+)?(M\d+(?:\s+(?:Pro|Max|Ultra))?)', short_name, re.I)
+    screen = re.search(r'(\d{2})(?:\.\d)?["\s]', short_name)
 
     result['products'].append({
         'code': code,
         'name': short_name,
-        'ram': ram.group(1) if ram else None,
-        'ssd': ssd.group(1) if ssd else None,
+        'specs': {
+            'ram': int(ram.group(1)) if ram else None,
+            'ssd': int(ssd.group(1)) if ssd else None,
+            'cpu': cpu.group(1).strip() if cpu else None,
+            'screen': screen.group(1) if screen else None,
+            'article': code  # DNS code is the article number
+        },
         'url': f"https://www.dns-shop.ru{url}"
     })
 

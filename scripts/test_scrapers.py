@@ -28,11 +28,23 @@ from urllib.parse import quote_plus
 from playwright.sync_api import sync_playwright, Page
 from playwright_stealth import Stealth
 
+# Import specs filtering module
+from specs_filter import TargetSpecs, filter_and_rank
+
 
 # === Конфигурация тестов ===
 
 TEST_ARTICLE = "Z14V0008D"
 TEST_PRODUCT = "MacBook Pro 16 M1 Pro 32GB 512GB"
+
+# Target specifications for filtering
+TARGET_SPECS = TargetSpecs(
+    screen="16",
+    cpu="M1 Pro",
+    ram=32,
+    ssd=512,
+    article="Z14V0008D"
+)
 
 # Ожидаемый диапазон цен для валидации
 MIN_EXPECTED_PRICE = 80000
@@ -275,12 +287,37 @@ def parse_citilink_nextjs(html: str) -> Optional[Dict]:
     return None
 
 
-def parse_dns_json(json_path: str) -> Optional[Dict]:
-    """Парсинг DNS-Shop JSON"""
+def parse_dns_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]:
+    """
+    Парсинг DNS-Shop JSON с фильтрацией по характеристикам
+
+    Args:
+        json_path: Path to JSON file
+        filter_specs: Enable specs filtering (default: True)
+    """
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
+        products = data.get("products", [])
+
+        if products and filter_specs:
+            # Apply specs filtering
+            filtered = filter_and_rank(products, TARGET_SPECS, threshold=80, top_n=3)
+
+            if filtered:
+                best_product, best_score = filtered[0]
+                return {
+                    "price": best_product.get("price"),
+                    "available": best_product.get("available", True),
+                    "name": best_product.get("name", ""),
+                    "count": len(filtered),
+                    "match_score": best_score,
+                    "matched_products": len(filtered),
+                    "total_products": len(products),
+                }
+
+        # Fallback to catalog.low_price (legacy behavior)
         catalog = data.get("catalog", {})
         if catalog.get("low_price"):
             return {
@@ -289,7 +326,8 @@ def parse_dns_json(json_path: str) -> Optional[Dict]:
                 "name": catalog.get("name", ""),
                 "count": catalog.get("count", 0),
             }
-    except Exception:
+    except Exception as e:
+        print(f"Error parsing DNS JSON: {e}")
         pass
 
     return None
@@ -1084,6 +1122,9 @@ def test_firefox(store: StoreConfig, query: str) -> TestResult:
             result.price = parsed["price"]
             result.available = parsed.get("available")
             result.details["products_count"] = parsed.get("count", 0)
+            result.details["match_score"] = parsed.get("match_score", 0)
+            result.details["matched_products"] = parsed.get("matched_products", 0)
+            result.details["total_products"] = parsed.get("total_products", 0)
             result.status = "PASS"
         else:
             result.status = "FAIL"
@@ -1190,7 +1231,16 @@ def print_summary(results: List[TestResult]):
         print("-" * 70)
         for r in sorted(passed, key=lambda x: x.price or 999999):
             avail = "[+]" if r.available else "[-]" if r.available is False else "[?]"
-            print(f"  {r.store}: {format_price(r.price)} {avail} ({r.response_time:.1f}s)")
+            base_info = f"  {r.store}: {format_price(r.price)} {avail} ({r.response_time:.1f}s)"
+
+            # Add match score if available (for filtered results)
+            if r.details.get("match_score"):
+                score = r.details["match_score"]
+                matched = r.details.get("matched_products", 0)
+                total = r.details.get("total_products", 0)
+                base_info += f" | Score: {score:.0f}% ({matched}/{total})"
+
+            print(base_info)
 
     if failed or errors:
         print("\n" + "-" * 70)
