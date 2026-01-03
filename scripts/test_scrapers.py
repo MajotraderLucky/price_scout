@@ -226,6 +226,86 @@ def extract_availability(html: str) -> Optional[bool]:
     return None
 
 
+def extract_product_name(html: str) -> str:
+    """Извлечь название товара из HTML"""
+    # Try various patterns
+
+    # Schema.org
+    match = re.search(r'itemprop="name"[^>]*>([^<]+)<', html, re.I)
+    if match:
+        return match.group(1).strip()
+
+    # og:title
+    match = re.search(r'<meta\s+property="og:title"\s+content="([^"]+)"', html, re.I)
+    if match:
+        return match.group(1).strip()
+
+    # title tag
+    match = re.search(r'<title>([^<]+)</title>', html, re.I)
+    if match:
+        title = match.group(1).strip()
+        # Remove common suffixes
+        title = re.sub(r'\s*[|—-]\s*.*$', '', title)
+        return title
+
+    # h1 tag
+    match = re.search(r'<h1[^>]*>([^<]+)</h1>', html, re.I)
+    if match:
+        return match.group(1).strip()
+
+    return ""
+
+
+def extract_specs_from_name(name: str) -> dict:
+    """Извлечение характеристик из названия (local copy)"""
+    if not name:
+        return {'cpu': None, 'ram': None, 'ssd': None, 'screen': None, 'article': None}
+
+    # Screen: "16.2", "16", "14.2"
+    screen_match = re.search(r'(\d{2})(?:\.\d)?["\s]', name)
+    screen = screen_match.group(1) if screen_match else None
+
+    # CPU: "M1 Pro", "M4 Max", "M5"
+    cpu_match = re.search(r'(?:Apple\s+)?(M\d+(?:\s+(?:Pro|Max|Ultra))?)', name, re.I)
+    cpu = cpu_match.group(1).strip() if cpu_match else None
+
+    # RAM: "32 ГБ", "32GB"
+    ram_match = re.search(r'(?:RAM|ОЗУ|память)?\s*(\d+)\s*(?:ГБ|GB)', name, re.I)
+    if not ram_match:
+        all_gb = re.findall(r'(\d+)\s*(?:ГБ|GB)', name, re.I)
+        ram = int(all_gb[0]) if all_gb else None
+    else:
+        ram = int(ram_match.group(1))
+
+    # SSD: "512 ГБ", "1TB"
+    ssd_match = re.search(r'(?:SSD|накопитель)\s*(\d+)\s*(?:ТБ|TB)', name, re.I)
+    if ssd_match:
+        ssd = int(ssd_match.group(1)) * 1000
+    else:
+        ssd_match = re.search(r'(?:SSD|накопитель)\s*(\d+)\s*(?:ГБ|GB)', name, re.I)
+        if not ssd_match:
+            all_tb = re.findall(r'(\d+)\s*(?:ТБ|TB)', name, re.I)
+            if all_tb:
+                ssd = int(all_tb[0]) * 1000
+            else:
+                all_gb = re.findall(r'(\d+)\s*(?:ГБ|GB)', name, re.I)
+                ssd = int(all_gb[1]) if len(all_gb) >= 2 else None
+        else:
+            ssd = int(ssd_match.group(1))
+
+    # Article: "Z14V0008D"
+    article_match = re.search(r'\b([A-Z]\d{2}[A-Z0-9]{5,})\b', name)
+    article = article_match.group(1) if article_match else None
+
+    return {
+        'cpu': cpu,
+        'ram': ram,
+        'ssd': ssd,
+        'screen': screen,
+        'article': article
+    }
+
+
 def parse_avito(html: str) -> Optional[Dict]:
     """Парсинг Avito (Schema.org)"""
     prices = []
@@ -333,13 +413,37 @@ def parse_dns_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]:
     return None
 
 
-def parse_avito_json(json_path: str) -> Optional[Dict]:
-    """Парсинг Avito JSON"""
+def parse_avito_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]:
+    """
+    Парсинг Avito JSON с фильтрацией по характеристикам
+
+    Args:
+        json_path: Path to JSON file
+        filter_specs: Enable specs filtering (default: True)
+    """
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         products = data.get("products", [])
+
+        if products and filter_specs:
+            # Apply specs filtering
+            filtered = filter_and_rank(products, TARGET_SPECS, threshold=80, top_n=3)
+
+            if filtered:
+                best_product, best_score = filtered[0]
+                return {
+                    "price": best_product.get("price"),
+                    "available": best_product.get("available", True),
+                    "name": best_product.get("name", ""),
+                    "count": len(filtered),
+                    "match_score": best_score,
+                    "matched_products": len(filtered),
+                    "total_products": len(products),
+                }
+
+        # Fallback to legacy behavior (MIN price)
         if products:
             prices = [p["price"] for p in products if p.get("price")]
             if prices:
@@ -348,7 +452,8 @@ def parse_avito_json(json_path: str) -> Optional[Dict]:
                     "available": True,
                     "count": len(products),
                 }
-    except Exception:
+    except Exception as e:
+        print(f"Error parsing Avito JSON: {e}")
         pass
 
     return None
@@ -498,6 +603,19 @@ def test_playwright_direct(store: StoreConfig, query: str) -> TestResult:
             result.price = extract_price(html)
             result.available = extract_availability(html)
 
+            # Извлечение названия и specs для фильтрации
+            product_name = extract_product_name(html)
+            if product_name:
+                specs = extract_specs_from_name(product_name)
+                # Calculate match score
+                from specs_filter import ProductSpecs, calculate_match_score
+                product_specs = ProductSpecs(**specs)
+                match_score = calculate_match_score(product_specs, TARGET_SPECS)
+
+                result.details["product_name"] = product_name
+                result.details["match_score"] = match_score
+                result.details["specs"] = specs
+
             if result.price:
                 result.status = "PASS"
             else:
@@ -599,6 +717,19 @@ def test_playwright_stealth(store: StoreConfig, query: str) -> TestResult:
             else:
                 result.price = extract_price(html)
                 result.available = extract_availability(html)
+
+                # Извлечение названия и specs для фильтрации
+                product_name = extract_product_name(html)
+                if product_name:
+                    specs = extract_specs_from_name(product_name)
+                    # Calculate match score
+                    from specs_filter import ProductSpecs, calculate_match_score
+                    product_specs = ProductSpecs(**specs)
+                    match_score = calculate_match_score(product_specs, TARGET_SPECS)
+
+                    result.details["product_name"] = product_name
+                    result.details["match_score"] = match_score
+                    result.details["specs"] = specs
 
             if result.price:
                 result.status = "PASS"
@@ -889,6 +1020,9 @@ def test_avito_firefox(store: StoreConfig, query: str) -> TestResult:
             result.price = parsed["price"]
             result.available = parsed.get("available")
             result.details["products_count"] = parsed.get("count", 0)
+            result.details["match_score"] = parsed.get("match_score", 0)
+            result.details["matched_products"] = parsed.get("matched_products", 0)
+            result.details["total_products"] = parsed.get("total_products", 0)
             result.status = "PASS"
         else:
             result.status = "FAIL"
@@ -1101,7 +1235,18 @@ def test_yandex_market_special(store: StoreConfig, query: str) -> TestResult:
                                 result.available = True
                                 break
 
+            # Извлечение названия и specs для Yandex Market
             if result.price:
+                product_name = extract_product_name(html)
+                if product_name:
+                    specs = extract_specs_from_name(product_name)
+                    from specs_filter import ProductSpecs, calculate_match_score
+                    product_specs = ProductSpecs(**specs)
+                    match_score = calculate_match_score(product_specs, TARGET_SPECS)
+                    result.details["product_name"] = product_name
+                    result.details["match_score"] = match_score
+                    result.details["specs"] = specs
+
                 result.status = "PASS"
             else:
                 result.status = "FAIL"

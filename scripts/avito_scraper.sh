@@ -177,39 +177,105 @@ result = {
     'timestamp': datetime.now().isoformat()
 }
 
-# Method 1: itemProp/itemprop="price" (case-insensitive)
-for match in re.findall(r'itemprop="price"\s+content="(\d+)"', html, re.IGNORECASE):
-    price = int(match)
+def extract_specs(name):
+    """Извлечение характеристик из названия"""
+    if not name:
+        return {'cpu': None, 'ram': None, 'ssd': None, 'screen': None, 'article': None}
+
+    # Screen: "16.2", "16", "14.2"
+    screen_match = re.search(r'(\d{2})(?:\.\d)?["\s]', name)
+    screen = screen_match.group(1) if screen_match else None
+
+    # CPU: "M1 Pro", "M4 Max", "M5"
+    cpu_match = re.search(r'(?:Apple\s+)?(M\d+(?:\s+(?:Pro|Max|Ultra))?)', name, re.I)
+    cpu = cpu_match.group(1).strip() if cpu_match else None
+
+    # RAM: "32 ГБ", "32GB"
+    ram_match = re.search(r'(?:RAM|ОЗУ|память)?\s*(\d+)\s*(?:ГБ|GB)', name, re.I)
+    if not ram_match:
+        all_gb = re.findall(r'(\d+)\s*(?:ГБ|GB)', name, re.I)
+        ram = int(all_gb[0]) if all_gb else None
+    else:
+        ram = int(ram_match.group(1))
+
+    # SSD: "512 ГБ", "1TB"
+    ssd_match = re.search(r'(?:SSD|накопитель)\s*(\d+)\s*(?:ТБ|TB)', name, re.I)
+    if ssd_match:
+        ssd = int(ssd_match.group(1)) * 1000
+    else:
+        ssd_match = re.search(r'(?:SSD|накопитель)\s*(\d+)\s*(?:ГБ|GB)', name, re.I)
+        if not ssd_match:
+            all_tb = re.findall(r'(\d+)\s*(?:ТБ|TB)', name, re.I)
+            if all_tb:
+                ssd = int(all_tb[0]) * 1000
+            else:
+                all_gb = re.findall(r'(\d+)\s*(?:ГБ|GB)', name, re.I)
+                ssd = int(all_gb[1]) if len(all_gb) >= 2 else None
+        else:
+            ssd = int(ssd_match.group(1))
+
+    # Article: "Z14V0008D"
+    article_match = re.search(r'\b([A-Z]\d{2}[A-Z0-9]{5,})\b', name)
+    article = article_match.group(1) if article_match else None
+
+    return {
+        'cpu': cpu,
+        'ram': ram,
+        'ssd': ssd,
+        'screen': screen,
+        'article': article
+    }
+
+# Try to extract product items with names
+products_data = []
+
+# Method 1: Schema.org with name + price
+# Pattern to match itemscope blocks containing both name and price
+item_blocks = re.findall(
+    r'<div[^>]*itemscope[^>]*>.*?itemprop="name"[^>]*>([^<]+)<.*?itemprop="price"\s+content="(\d+)".*?</div>',
+    html,
+    re.DOTALL | re.IGNORECASE
+)
+for name, price in item_blocks:
+    price = int(price)
     if 50000 < price < 500000:
-        result['products'].append({
+        name = re.sub(r'\s+', ' ', name).strip()
+        products_data.append({
+            'name': name,
             'price': price,
             'available': True
         })
 
-# Method 2: data-marker="item-price" with meta tag
-if not result['products']:
+# Method 2: Fallback - prices without names
+if not products_data:
+    for match in re.findall(r'itemprop="price"\s+content="(\d+)"', html, re.IGNORECASE):
+        price = int(match)
+        if 50000 < price < 500000:
+            products_data.append({
+                'price': price,
+                'available': True,
+                'name': ''
+            })
+
+# Method 3: data-marker="item-price" with meta tag
+if not products_data:
     for match in re.findall(r'data-marker="item-price"[^<]*<meta[^>]+content="(\d+)"', html, re.IGNORECASE):
         price = int(match)
         if 50000 < price < 500000:
-            result['products'].append({
+            products_data.append({
                 'price': price,
-                'available': True
+                'available': True,
+                'name': ''
             })
 
-# Fallback: JSON-LD
-if not result['products']:
-    for match in re.findall(r'"price":\s*"?(\d+)"?', html):
-        price = int(match)
-        if 50000 < price < 500000:
-            result['products'].append({
-                'price': price,
-                'available': True
-            })
+# Add specs to products
+for p in products_data:
+    p['specs'] = extract_specs(p.get('name', ''))
 
 # Уникальные цены
 seen = set()
 unique_products = []
-for p in result['products']:
+for p in products_data:
     if p['price'] not in seen:
         seen.add(p['price'])
         unique_products.append(p)
