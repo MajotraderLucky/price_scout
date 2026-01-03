@@ -229,16 +229,19 @@ def extract_specs(name):
 # Try to extract product items with names
 products_data = []
 
-# Method 1: Schema.org with name + price
-# Pattern to match itemscope blocks containing both name and price
-item_blocks = re.findall(
-    r'<div[^>]*itemscope[^>]*>.*?itemprop="name"[^>]*>([^<]+)<.*?itemprop="price"\s+content="(\d+)".*?</div>',
-    html,
-    re.DOTALL | re.IGNORECASE
-)
-for name, price in item_blocks:
-    price = int(price)
+# Method 1: Extract from data-marker="item-title" title attribute (current Avito structure)
+# Extract all titles first (title attribute comes BEFORE data-marker in HTML)
+titles = re.findall(r'title="([^"]+)"[^>]*data-marker="item-title"', html, re.IGNORECASE)
+
+# Extract all prices
+prices = re.findall(r'<meta\s+itemProp="price"\s+content="(\d+)"', html, re.IGNORECASE)
+
+# Pair them up (assuming same order in HTML)
+for i, (title, price_str) in enumerate(zip(titles, prices)):
+    price = int(price_str)
     if 50000 < price < 500000:
+        # Remove location suffix like " в Дно", " в Москве" from title
+        name = re.sub(r'\s+в\s+[А-Яа-яЁё\s\-]+$', '', title)
         name = re.sub(r'\s+', ' ', name).strip()
         products_data.append({
             'name': name,

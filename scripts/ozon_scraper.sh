@@ -226,12 +226,30 @@ if not products_data:
         if 50000 < price < 500000:
             products_data.append({'price': price, 'available': True, 'name': ''})
 
-# Method 3: data-widget prices
+# Method 3: Extract from product tile links (current Ozon structure)
+# Product tiles have href="/product/NAME-ID/" and nearby price spans
 if not products_data:
+    # Find product URLs and extract names from slug
+    product_links = re.findall(r'href="/product/([^/]+)-(\d+)/', html)
+    for slug, product_id in product_links:
+        # Convert slug to readable name: "apple-macbook-air-13" -> "Apple Macbook Air 13"
+        name = slug.replace('-', ' ').title()
+        products_data.append({'name': name, 'price': None, 'product_id': product_id, 'available': True})
+
+    # Extract prices separately from price spans (format: "113 999 ₽")
+    prices = []
     for match in re.findall(r'(\d{2,3})\s*(\d{3})\s*₽', html):
         price = int(match[0] + match[1])
         if 50000 < price < 500000:
-            products_data.append({'price': price, 'available': True, 'name': ''})
+            prices.append(price)
+
+    # Match prices to products (assume same order in HTML)
+    for i, product in enumerate(products_data):
+        if i < len(prices):
+            product['price'] = prices[i]
+
+    # Remove products without prices
+    products_data = [p for p in products_data if p.get('price')]
 
 # Add specs to products
 for p in products_data:
