@@ -158,34 +158,93 @@ result = {
     'timestamp': datetime.now().isoformat()
 }
 
-# Method 1: Search in JSON state
-# Ozon stores data in __NUXT__ or similar
-for match in re.findall(r'"finalPrice":\s*(\d+)', html):
-    price = int(match)
-    if 50000 < price < 500000:
-        result['products'].append({'price': price, 'available': True})
+def extract_specs(name):
+    """Извлечение характеристик из названия"""
+    if not name:
+        return {'cpu': None, 'ram': None, 'ssd': None, 'screen': None, 'article': None}
 
-# Method 2: data-widget prices
-if not result['products']:
+    # Screen: "16.2", "16", "14.2"
+    screen_match = re.search(r'(\d{2})(?:\.\d)?["\s]', name)
+    screen = screen_match.group(1) if screen_match else None
+
+    # CPU: "M1 Pro", "M4 Max", "M5"
+    cpu_match = re.search(r'(?:Apple\s+)?(M\d+(?:\s+(?:Pro|Max|Ultra))?)', name, re.I)
+    cpu = cpu_match.group(1).strip() if cpu_match else None
+
+    # RAM: "32 ГБ", "32GB"
+    ram_match = re.search(r'(?:RAM|ОЗУ|память)?\s*(\d+)\s*(?:ГБ|GB)', name, re.I)
+    if not ram_match:
+        all_gb = re.findall(r'(\d+)\s*(?:ГБ|GB)', name, re.I)
+        ram = int(all_gb[0]) if all_gb else None
+    else:
+        ram = int(ram_match.group(1))
+
+    # SSD: "512 ГБ", "1TB"
+    ssd_match = re.search(r'(?:SSD|накопитель)\s*(\d+)\s*(?:ТБ|TB)', name, re.I)
+    if ssd_match:
+        ssd = int(ssd_match.group(1)) * 1000
+    else:
+        ssd_match = re.search(r'(?:SSD|накопитель)\s*(\d+)\s*(?:ГБ|GB)', name, re.I)
+        if not ssd_match:
+            all_tb = re.findall(r'(\d+)\s*(?:ТБ|TB)', name, re.I)
+            if all_tb:
+                ssd = int(all_tb[0]) * 1000
+            else:
+                all_gb = re.findall(r'(\d+)\s*(?:ГБ|GB)', name, re.I)
+                ssd = int(all_gb[1]) if len(all_gb) >= 2 else None
+        else:
+            ssd = int(ssd_match.group(1))
+
+    # Article: "Z14V0008D"
+    article_match = re.search(r'\b([A-Z]\d{2}[A-Z0-9]{5,})\b', name)
+    article = article_match.group(1) if article_match else None
+
+    return {
+        'cpu': cpu,
+        'ram': ram,
+        'ssd': ssd,
+        'screen': screen,
+        'article': article
+    }
+
+# Try to extract product data with names from JSON state
+products_data = []
+
+# Method 1: Extract from JSON state (finalPrice + name)
+# Look for product objects with both name and price
+json_pattern = r'"(?:name|title)":\s*"([^"]+)"[^}]*?"finalPrice":\s*(\d+)|"finalPrice":\s*(\d+)[^}]*?"(?:name|title)":\s*"([^"]+)"'
+for match in re.finditer(json_pattern, html):
+    name = match.group(1) or match.group(4)
+    price = int(match.group(2) or match.group(3))
+    if name and 50000 < price < 500000:
+        products_data.append({'name': name, 'price': price, 'available': True})
+
+# Method 2: Fallback to prices only (if names not found)
+if not products_data:
+    for match in re.findall(r'"finalPrice":\s*(\d+)', html):
+        price = int(match)
+        if 50000 < price < 500000:
+            products_data.append({'price': price, 'available': True, 'name': ''})
+
+# Method 3: data-widget prices
+if not products_data:
     for match in re.findall(r'(\d{2,3})\s*(\d{3})\s*₽', html):
         price = int(match[0] + match[1])
         if 50000 < price < 500000:
-            result['products'].append({'price': price, 'available': True})
+            products_data.append({'price': price, 'available': True, 'name': ''})
 
-# Method 3: price in meta
-if not result['products']:
-    for match in re.findall(r'"price":\s*"?(\d+)"?', html):
-        price = int(match)
-        if 50000 < price < 500000:
-            result['products'].append({'price': price, 'available': True})
+# Add specs to products
+for p in products_data:
+    p['specs'] = extract_specs(p.get('name', ''))
 
-# Dedupe
+# Dedupe by price
 seen = set()
 unique = []
-for p in result['products']:
+for p in products_data:
     if p['price'] not in seen:
         seen.add(p['price'])
         unique.append(p)
+
 result['products'] = unique
 
 with open(json_file, 'w', encoding='utf-8') as f:

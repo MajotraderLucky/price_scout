@@ -354,36 +354,84 @@ def parse_avito_json(json_path: str) -> Optional[Dict]:
     return None
 
 
-def parse_citilink_json(json_path: str) -> Optional[Dict]:
-    """Парсинг Citilink JSON"""
+def parse_citilink_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]:
+    """
+    Парсинг Citilink JSON с фильтрацией по характеристикам
+
+    Args:
+        json_path: Path to JSON file
+        filter_specs: Enable specs filtering (default: True)
+    """
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         products = data.get("products", [])
+
+        if products and filter_specs:
+            # Apply specs filtering
+            filtered = filter_and_rank(products, TARGET_SPECS, threshold=80, top_n=3)
+
+            if filtered:
+                best_product, best_score = filtered[0]
+                return {
+                    "price": best_product.get("price"),
+                    "available": best_product.get("available", True),
+                    "name": best_product.get("name", ""),
+                    "count": len(filtered),
+                    "match_score": best_score,
+                    "matched_products": len(filtered),
+                    "total_products": len(products),
+                }
+
+        # Fallback to legacy behavior (MIN price)
         if products:
             prices = [p["price"] for p in products if p.get("price") and p["price"] > 0]
             if prices:
-                # Находим товары в наличии
                 available_products = [p for p in products if p.get("available")]
                 return {
                     "price": min(prices),
                     "available": len(available_products) > 0,
                     "count": len(products),
                 }
-    except Exception:
+    except Exception as e:
+        print(f"Error parsing Citilink JSON: {e}")
         pass
 
     return None
 
 
-def parse_ozon_json(json_path: str) -> Optional[Dict]:
-    """Парсинг Ozon JSON"""
+def parse_ozon_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]:
+    """
+    Парсинг Ozon JSON с фильтрацией по характеристикам
+
+    Args:
+        json_path: Path to JSON file
+        filter_specs: Enable specs filtering (default: True)
+    """
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         products = data.get("products", [])
+
+        if products and filter_specs:
+            # Apply specs filtering
+            filtered = filter_and_rank(products, TARGET_SPECS, threshold=80, top_n=3)
+
+            if filtered:
+                best_product, best_score = filtered[0]
+                return {
+                    "price": best_product.get("price"),
+                    "available": best_product.get("available", True),
+                    "name": best_product.get("name", ""),
+                    "count": len(filtered),
+                    "match_score": best_score,
+                    "matched_products": len(filtered),
+                    "total_products": len(products),
+                }
+
+        # Fallback to legacy behavior (MIN price)
         if products:
             prices = [p["price"] for p in products if p.get("price")]
             if prices:
@@ -392,7 +440,8 @@ def parse_ozon_json(json_path: str) -> Optional[Dict]:
                     "available": True,
                     "count": len(products),
                 }
-    except Exception:
+    except Exception as e:
+        print(f"Error parsing Ozon JSON: {e}")
         pass
 
     return None
@@ -762,6 +811,9 @@ def test_ozon_firefox(store: StoreConfig, query: str) -> TestResult:
             result.price = parsed["price"]
             result.available = parsed.get("available")
             result.details["products_count"] = parsed.get("count", 0)
+            result.details["match_score"] = parsed.get("match_score", 0)
+            result.details["matched_products"] = parsed.get("matched_products", 0)
+            result.details["total_products"] = parsed.get("total_products", 0)
             result.status = "PASS"
         else:
             result.status = "FAIL"
@@ -912,6 +964,9 @@ def test_citilink_firefox(store: StoreConfig, query: str) -> TestResult:
             result.price = parsed["price"]
             result.available = parsed.get("available")
             result.details["products_count"] = parsed.get("count", 0)
+            result.details["match_score"] = parsed.get("match_score", 0)
+            result.details["matched_products"] = parsed.get("matched_products", 0)
+            result.details["total_products"] = parsed.get("total_products", 0)
             result.status = "PASS"
         else:
             result.status = "FAIL"
