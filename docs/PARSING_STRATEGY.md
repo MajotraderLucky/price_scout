@@ -1,234 +1,231 @@
 # Price Scout - Стратегия парсинга
 
-## Выбранный источник: E-katalog.ru
+> Обновлено: 2026-01-02
 
-### Почему E-katalog
+## Текущий статус: 8/8 магазинов работают
 
-| Критерий                | E-katalog              | Прямой парсинг WB/Ozon |
-|-------------------------|------------------------|------------------------|
-| Количество источников   | 1 сайт                 | 5+ сайтов              |
-| Охват магазинов         | Сотни                  | По 1 на каждый         |
-| Сложность поддержки     | Низкая                 | Высокая                |
-| Блокировки              | Умеренные              | Агрессивные            |
-| История цен             | [+] Есть               | [X] Нужно собирать     |
-| Стоимость               | Бесплатно              | Бесплатно              |
+### Работающие магазины
+
+| Магазин       | Метод                 | Защита           | Время   | Статус   |
+|---------------|-----------------------|------------------|---------|----------|
+| DNS-Shop      | Firefox + xdotool     | Qrator (сложная) | 38.2s   | [+] PASS |
+| Ozon          | Firefox + xdotool     | Bot detection    | 52.4s   | [+] PASS |
+| i-ray.ru      | Playwright Direct     | Нет              | 4.1s    | [+] PASS |
+| Citilink      | Playwright + Stealth  | Rate Limit (429) | 14.5s   | [+] PASS |
+| nix.ru        | Playwright Direct     | Нет              | 3.6s    | [+] PASS |
+| regard.ru     | Playwright Stealth    | Bot detection    | 7.9s    | [+] PASS |
+| kns.ru        | Playwright Direct     | Нет              | 3.5s    | [+] PASS |
+| Yandex Market | Playwright + Stealth  | SmartCaptcha     | 15.4s   | [+] PASS |
+
+### Заблокированные магазины
+
+| Магазин       | Проблема           | Требуется        |
+|---------------|--------------------|------------------|
+| Avito         | IP блокировка      | Прокси           |
+| E-katalog.ru  | IP блокировка      | Локальный запуск |
 
 ---
 
-## Стратегия парсинга
+## Методы парсинга
 
-### Приоритет 1: Поиск скрытого API
+### 1. Playwright Direct
 
-Перед написанием HTML-парсера необходимо исследовать сайт на наличие внутреннего API.
+**Для:** Магазины без защиты (i-ray, nix, kns)
 
-**Преимущества скрытого API:**
-- Скорость: ~0.3 сек vs ~5 сек (HTML)
-- Стабильность: не зависит от изменений верстки
-- Структурированные данные: JSON/Protobuf
-
-**Методика поиска:**
-
+```python
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    context = browser.new_context(
+        viewport={"width": 1920, "height": 1080},
+        user_agent="Mozilla/5.0 ...",
+        locale="ru-RU",
+    )
+    page = context.new_page()
+    response = page.goto(url, wait_until="domcontentloaded")
+    html = page.content()
 ```
-1. Открыть DevTools -> Network
-2. Выполнить поиск на сайте
-3. Фильтровать по XHR/Fetch
-4. Искать запросы с JSON/Protobuf ответами
-5. Проанализировать структуру запросов
+
+**Преимущества:**
+- Быстрый (3-5 сек)
+- Простой
+- Минимум ресурсов
+
+### 2. Playwright Stealth
+
+**Для:** Магазины с базовой защитой (regard, Citilink, Yandex Market)
+
+```python
+from playwright_stealth import Stealth
+
+stealth = Stealth(
+    navigator_languages_override=("ru-RU", "ru"),
+    navigator_platform_override="Win32",
+)
+stealth.apply_stealth_sync(page)
 ```
 
-**Признаки скрытого API:**
-- Content-Type: application/json
-- Content-Type: application/x-protobuf
-- URL содержит /api/, /v1/, /graphql
+**Особенности:**
+- Патчит `navigator.webdriver`
+- Эмулирует реальный браузер
+- Добавляет случайные задержки
 
----
+### 3. Firefox + xdotool (Xvfb)
 
-### Приоритет 2: HTML парсинг (fallback)
-
-Если скрытое API не найдено, используем Playwright для парсинга HTML.
-
-**Технологии:**
-
-| Компонент        | Rust                   | Python (прототип)      |
-|------------------|------------------------|------------------------|
-| Браузер          | chromiumoxide          | Playwright             |
-| HTML парсинг     | scraper                | BeautifulSoup          |
-| Антидетект       | Собственная реализация | playwright-stealth     |
-
----
-
-## План исследования E-katalog
-
-### Этап 1: Разведка (1-2 часа)
+**Для:** Сложная защита (DNS-Shop, Ozon)
 
 ```bash
-# Задачи:
-1. Открыть https://e-katalog.ru в браузере
-2. DevTools -> Network -> включить "Preserve log"
-3. Выполнить поиск "Samsung Galaxy S24"
-4. Записать все XHR/Fetch запросы
-5. Проанализировать ответы на наличие JSON
+# Запуск в виртуальном дисплее
+xvfb-run -a --server-args="-screen 0 1920x1080x24" firefox "$URL" &
+
+# Ожидание загрузки
+sleep 30
+
+# Имитация действий пользователя
+xdotool key Page_Down
+xdotool key ctrl+u  # View Source
+xdotool key ctrl+a  # Select All
+xdotool key ctrl+c  # Copy
+
+# Сохранение из буфера
+xclip -selection clipboard -o > output.html
 ```
 
-**Чек-лист:**
-
-- [ ] Найти endpoint поиска
-- [ ] Найти endpoint получения цен
-- [ ] Определить параметры запросов
-- [ ] Проверить необходимость авторизации
-- [ ] Проверить наличие rate limiting
-
-### Этап 2: Прототип парсера (2-4 часа)
-
-```python
-# Python прототип для быстрой проверки концепции
-from playwright.sync_api import sync_playwright
-
-def search_ekatalog(query: str) -> list:
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) ..."
-        )
-        page = context.new_page()
-
-        # Поиск
-        url = f"https://e-katalog.ru/ek-list.php?search_={query}"
-        page.goto(url)
-        page.wait_for_load_state("networkidle")
-
-        # Извлечение данных (селекторы уточнить!)
-        products = []
-        cards = page.query_selector_all(".model-short-block")
-
-        for card in cards:
-            name = card.query_selector(".model-short-title")
-            price = card.query_selector(".model-price-range")
-
-            if name and price:
-                products.append({
-                    "name": name.inner_text(),
-                    "price": price.inner_text(),
-                })
-
-        browser.close()
-        return products
-```
-
-### Этап 3: Определение CSS-селекторов
-
-**Предполагаемая структура (требует проверки):**
-
-| Элемент           | Предполагаемый селектор        |
-|-------------------|--------------------------------|
-| Карточка товара   | `.model-short-block`           |
-| Название          | `.model-short-title a`         |
-| Диапазон цен      | `.model-price-range`           |
-| Мин. цена         | `.price-range .pr31`           |
-| Ссылка на товар   | `.model-short-title a[href]`   |
-| Изображение       | `.model-short-img img`         |
-
-**Страница товара (для получения цен по магазинам):**
-
-| Элемент           | Предполагаемый селектор        |
-|-------------------|--------------------------------|
-| Таблица цен       | `.where-buy-table`             |
-| Магазин           | `.where-buy-shop-name`         |
-| Цена              | `.where-buy-price`             |
-| Ссылка            | `.where-buy-link a[href]`      |
+**Почему работает:**
+- Реальный Firefox (не headless)
+- Нет признаков автоматизации
+- Полная эмуляция пользователя
 
 ---
 
-## Антибот меры
-
-### Защита E-katalog (ожидаемая)
-
-| Мера                  | Вероятность | Решение                       |
-|-----------------------|-------------|-------------------------------|
-| Rate limiting         | Высокая     | Задержки 2-5 сек между зап.   |
-| User-Agent проверка   | Высокая     | Реалистичный UA               |
-| Cookie проверка       | Средняя     | Сохранение сессии             |
-| JavaScript challenge  | Средняя     | Playwright (реальный браузер) |
-| CAPTCHA               | Низкая      | Ручное решение / сервисы      |
-| IP блокировка         | Низкая      | Ротация при необходимости     |
-
-### Рекомендуемые настройки
+## Retry логика (Citilink)
 
 ```python
-# Playwright context settings
-context = browser.new_context(
-    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    viewport={"width": 1920, "height": 1080},
-    locale="ru-RU",
-    timezone_id="Europe/Moscow",
+max_retries = 3
+retry_delay = 30  # секунд
+
+for attempt in range(max_retries):
+    response = page.goto(url)
+
+    if response.status == 429:
+        if attempt < max_retries - 1:
+            time.sleep(retry_delay)
+            retry_delay += 15  # Увеличиваем задержку
+            continue
+        else:
+            return "FAIL"
+
+    # Успех
+    break
+```
+
+---
+
+## Парсинг данных
+
+### Schema.org / JSON-LD
+
+```python
+# itemprop="price"
+match = re.search(r'itemprop="price"\s+content="(\d+)"', html)
+
+# JSON-LD
+match = re.search(r'"price":\s*(\d+)', html)
+```
+
+### Next.js (Citilink)
+
+```python
+match = re.search(
+    r'<script id="__NEXT_DATA__" type="application/json">(.+?)</script>',
+    html
 )
+data = json.loads(match.group(1))
+products = data["props"]["pageProps"]["effectorValues"]["..."]["products"]
+```
 
-# Задержки между запросами
-import random
-import time
+### Yandex Market
 
-def random_delay():
-    time.sleep(random.uniform(2, 5))
+```python
+# Thin space (U+2006) в ценах
+match = re.search(r'"price":\s*\{\s*"value"\s*:\s*"?(\d+)"?', html)
+
+# Альтернатива: data-auto="price-value"
+elements = page.query_selector_all('[data-auto="price-value"]')
+```
+
+### DNS-Shop JSON API
+
+```python
+# Данные в catalog JSON
+with open(json_path) as f:
+    data = json.load(f)
+
+price = data["catalog"]["low_price"]
+count = data["catalog"]["count"]
 ```
 
 ---
 
-## Кэширование
+## Инфраструктура
 
-### Стратегия кэширования
+### Сервера
 
-| Тип данных           | TTL        | Хранилище  |
-|----------------------|------------|------------|
-| Результаты поиска    | 1 час      | Redis      |
-| Цены на товар        | 1 час      | Redis      |
-| Информация о товаре  | 24 часа    | PostgreSQL |
-| История цен          | Бессрочно  | PostgreSQL |
+| Сервер   | IP              | Провайдер  | Использование |
+|----------|-----------------|------------|---------------|
+| VPS      | 185.105.108.119 | Datacenter | CAPTCHA       |
+| Archbook | 91.122.50.46    | Ростелеком | Production    |
 
-### Redis ключи
+### Почему Archbook работает
 
-```
-search:{query_hash}           -> JSON результатов поиска
-product:{product_id}:prices   -> JSON цен по магазинам
-product:{product_id}:info     -> JSON информации о товаре
-```
+1. **Резидентный IP** (Ростелеком) - не в blacklist'ах
+2. **i3 window manager** - легковесный WM для Xvfb
+3. **Firefox real** - не определяется как бот
+4. **xdotool** - имитация реальных действий
 
 ---
 
-## Расписание проверок
+## Антибот защита
 
-### MVP (Фаза 1)
+### Типы защиты и методы обхода
 
-- Парсинг только по запросу пользователя
-- Кэширование на 1 час
+| Защита            | Примеры          | Решение                      |
+|-------------------|------------------|------------------------------|
+| Headless detect   | Ozon, DNS        | Firefox + xdotool            |
+| Rate limiting     | Citilink         | Retry + задержки 30-60 сек   |
+| Bot detection     | regard           | Playwright Stealth           |
+| SmartCaptcha      | Yandex           | Stealth + медленная загрузка |
+| IP blocking       | Avito            | Прокси (не решено)           |
+| Qrator WAF        | DNS-Shop         | Firefox + резидентный IP     |
 
-### Фаза 2 (Отслеживание)
+### Рекомендуемые задержки
 
-| Категория товаров    | Частота проверки |
-|----------------------|------------------|
-| Отслеживаемые        | Каждые 6 часов   |
-| Популярные запросы   | Каждые 12 часов  |
-| Остальные            | По запросу       |
+| Магазин       | Между запросами | После загрузки |
+|---------------|-----------------|----------------|
+| i-ray, nix    | 2-3 сек         | 2 сек          |
+| regard        | 3-5 сек         | 2-4 сек        |
+| Citilink      | 8-15 сек        | 5-8 сек        |
+| DNS, Ozon     | 30-45 сек       | 35 сек         |
+| Yandex Market | 5-8 сек         | 5-8 сек        |
 
 ---
 
-## Метрики и мониторинг
+## Скрипты
 
-### Что отслеживать
-
-| Метрика                    | Цель              |
-|----------------------------|-------------------|
-| Время ответа парсера       | < 10 сек          |
-| Процент успешных запросов  | > 95%             |
-| Cache hit rate             | > 70%             |
-| Количество блокировок      | < 1% запросов     |
+| Скрипт                 | Метод                | Магазины                    |
+|------------------------|----------------------|-----------------------------|
+| test_scrapers.py       | Unified test system  | Все 8 магазинов             |
+| dns_scraper.sh         | Firefox + xdotool    | DNS-Shop                    |
+| ozon_scraper.sh        | Firefox + xdotool    | Ozon                        |
+| stealth_scraper.py     | Playwright Stealth   | regard.ru                   |
+| citilink_playwright.py | Playwright + delay   | Citilink                    |
 
 ---
 
 ## Следующие шаги
 
-1. [ ] Исследовать E-katalog через DevTools
-2. [ ] Найти скрытое API (если есть)
-3. [ ] Определить точные CSS-селекторы
-4. [ ] Создать Python прототип парсера
-5. [ ] Протестировать на 100 запросах
-6. [ ] Портировать на Rust для production
+- [X] Добавить Ozon (Firefox метод)
+- [X] Добавить Yandex Market (Stealth метод)
+- [X] Retry логика для Citilink (429)
+- [ ] Прокси для Avito
+- [ ] Локальный запуск для E-katalog
+- [ ] Автоматический сбор цен по расписанию

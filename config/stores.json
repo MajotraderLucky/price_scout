@@ -1,0 +1,62 @@
+{
+  "stores": [
+    {
+      "name": "centrsvyazi",
+      "search_url": "https://centrsvyazi.ru/search?q={query}",
+      "method": "direct",
+      "status": "working"
+    },
+    {
+      "name": "i-ray",
+      "search_url": "https://i-ray.ru/search?q={query}",
+      "method": "direct",
+      "status": "working"
+    },
+    {
+      "name": "citilink",
+      "search_url": "https://www.citilink.ru/search/?text={query}",
+      "method": "stealth",
+      "parser": "nextjs",
+      "status": "working"
+    },
+    {
+      "name": "regard",
+      "search_url": "https://www.regard.ru/catalog?search={query}",
+      "method": "stealth",
+      "status": "working"
+    },
+    {
+      "name": "kns",
+      "search_url": "https://www.kns.ru/search/?q={query}",
+      "method": "direct",
+      "status": "working"
+    },
+    {
+      "name": "dns",
+      "search_url": "https://www.dns-shop.ru/search/?q={query}",
+      "method": "firefox",
+      "status": "blocked",
+      "note": "IP banned + Qrator"
+    }
+  ],
+  "pending": [
+    {
+      "name": "avito",
+      "search_url": "https://www.avito.ru/all?q={query}",
+      "method": "unknown",
+      "status": "not_tested"
+    },
+    {
+      "name": "yandex_market",
+      "search_url": "https://market.yandex.ru/search?text={query}",
+      "method": "unknown",
+      "status": "not_tested"
+    },
+    {
+      "name": "cdek_shop",
+      "search_url": "https://shop.cdek.ru/search?q={query}",
+      "method": "unknown",
+      "status": "not_tested"
+    }
+  ]
+}
