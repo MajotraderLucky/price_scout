@@ -1518,9 +1518,9 @@ def output_json(results: List[TestResult], query: str):
             "store": result.store,
             "status": result.status,
             "price": result.price,
-            "count": result.count,
-            "time": result.time,
-            "error": result.error,
+            "count": result.details.get("count"),  # Get count from details if available
+            "time": result.response_time,
+            "error": result.error if result.error else None,
             "method": result.method,
         }
     else:
@@ -1533,9 +1533,9 @@ def output_json(results: List[TestResult], query: str):
                     "store": r.store,
                     "status": r.status,
                     "price": r.price,
-                    "count": r.count,
-                    "time": r.time,
-                    "error": r.error,
+                    "count": r.details.get("count"),
+                    "time": r.response_time,
+                    "error": r.error if r.error else None,
                     "method": r.method,
                 }
                 for r in results
