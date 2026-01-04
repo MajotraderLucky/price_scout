@@ -85,6 +85,7 @@ class StoreConfig:
     lowercase: bool = False
     delay: int = 0
     validate_price: bool = True
+    unstable: bool = False  # Пометка для нестабильных магазинов (rate limiting, CAPTCHA)
 
 
 # === Конфигурация магазинов ===
@@ -115,10 +116,10 @@ STORES: List[StoreConfig] = [
     ),
     StoreConfig(
         name="citilink",
-        method="citilink_special",  # Playwright с длительными задержками (rate limiting)
+        method="citilink_firefox",  # Firefox + xdotool метод (обход rate limiting)
         search_url="https://www.citilink.ru/search/?text=MacBook+Pro+16",
-        parser="citilink",
-        delay=8,
+        parser="citilink_json",
+        unstable=True,  # Агрессивный rate limiting - тестировать только вручную с интервалом 5+ мин
     ),
     StoreConfig(
         name="dns",
@@ -504,6 +505,9 @@ def parse_citilink_json(json_path: str, filter_specs: bool = True) -> Optional[D
                     "price": min(prices),
                     "available": len(available_products) > 0,
                     "count": len(products),
+                    "match_score": 0,
+                    "matched_products": 0,
+                    "total_products": len(products),
                 }
     except Exception as e:
         print(f"Error parsing Citilink JSON: {e}")
@@ -1388,7 +1392,7 @@ def run_test(store: StoreConfig, query: str) -> TestResult:
         )
 
 
-def run_all_tests(query: str, skip_firefox: bool = False, store_filter: str = None) -> List[TestResult]:
+def run_all_tests(query: str, skip_firefox: bool = False, skip_unstable: bool = False, store_filter: str = None) -> List[TestResult]:
     """Запуск всех тестов"""
     results = []
 
@@ -1404,6 +1408,16 @@ def run_all_tests(query: str, skip_firefox: bool = False, store_filter: str = No
                 method=store.method,
                 status="SKIP",
                 error="Skipped (--quick mode)"
+            ))
+            continue
+
+        # Skip unstable stores (rate limiting, CAPTCHA)
+        if skip_unstable and store.unstable:
+            results.append(TestResult(
+                store=store.name,
+                method=store.method,
+                status="SKIP",
+                error=f"Skipped (unstable, use --store={store.name} to test)"
             ))
             continue
 
@@ -1499,11 +1513,29 @@ def main():
     print("=" * 70)
     print("PRICE SCOUT - Scraper Test System")
     print("=" * 70)
+
+    # Help message
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print("\nUsage:")
+        print("  python test_scrapers.py                    # All stores (including unstable)")
+        print("  python test_scrapers.py --quick            # Skip Firefox methods")
+        print("  python test_scrapers.py --skip-unstable    # Skip unstable stores (Citilink)")
+        print("  python test_scrapers.py --store=citilink   # Test only Citilink")
+        print("")
+        print("Options:")
+        print("  --help, -h         Show this help message")
+        print("  --quick            Skip Firefox-based tests (faster)")
+        print("  --skip-unstable    Skip stores with rate limiting issues")
+        print("  --store=NAME       Test only specific store")
+        print("")
+        return
+
     print(f"Test article: {TEST_ARTICLE}")
     print(f"Test product: {TEST_PRODUCT}")
 
     # Аргументы
     skip_firefox = "--quick" in sys.argv
+    skip_unstable = "--skip-unstable" in sys.argv
     store_filter = None
 
     for arg in sys.argv[1:]:
@@ -1514,13 +1546,15 @@ def main():
 
     if skip_firefox:
         print("Mode: QUICK (skipping Firefox tests)")
+    if skip_unstable:
+        print("Mode: STABLE-ONLY (skipping unstable stores)")
     if store_filter:
         print(f"Filter: {store_filter}")
 
     print(f"Stores to test: {len([s for s in STORES if not store_filter or s.name == store_filter])}")
 
     # Запуск тестов
-    results = run_all_tests(TEST_ARTICLE, skip_firefox=skip_firefox, store_filter=store_filter)
+    results = run_all_tests(TEST_ARTICLE, skip_firefox=skip_firefox, skip_unstable=skip_unstable, store_filter=store_filter)
 
     # Сводка
     print_summary(results)

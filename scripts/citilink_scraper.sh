@@ -196,6 +196,55 @@ result = {
     'timestamp': datetime.now().isoformat()
 }
 
+def extract_specs(name):
+    """Извлечение характеристик из названия"""
+    if not name:
+        return {'cpu': None, 'ram': None, 'ssd': None, 'screen': None, 'article': None}
+
+    # Screen: "16.2", "16", "14.2"
+    screen_match = re.search(r'(\d{2})(?:\.\d)?["\s]', name)
+    screen = screen_match.group(1) if screen_match else None
+
+    # CPU: "M1 Pro", "M4 Max", "M5"
+    cpu_match = re.search(r'(?:Apple\s+)?(M\d+(?:\s+(?:Pro|Max|Ultra))?)', name, re.I)
+    cpu = cpu_match.group(1).strip() if cpu_match else None
+
+    # RAM: "32 ГБ", "32GB"
+    ram_match = re.search(r'(?:RAM|ОЗУ|память)?\s*(\d+)\s*(?:ГБ|GB)', name, re.I)
+    if not ram_match:
+        all_gb = re.findall(r'(\d+)\s*(?:ГБ|GB)', name, re.I)
+        ram = int(all_gb[0]) if all_gb else None
+    else:
+        ram = int(ram_match.group(1))
+
+    # SSD: "512 ГБ", "1TB"
+    ssd_match = re.search(r'(?:SSD|накопитель)\s*(\d+)\s*(?:ТБ|TB)', name, re.I)
+    if ssd_match:
+        ssd = int(ssd_match.group(1)) * 1000
+    else:
+        ssd_match = re.search(r'(?:SSD|накопитель)\s*(\d+)\s*(?:ГБ|GB)', name, re.I)
+        if not ssd_match:
+            all_tb = re.findall(r'(\d+)\s*(?:ТБ|TB)', name, re.I)
+            if all_tb:
+                ssd = int(all_tb[0]) * 1000
+            else:
+                all_gb = re.findall(r'(\d+)\s*(?:ГБ|GB)', name, re.I)
+                ssd = int(all_gb[1]) if len(all_gb) >= 2 else None
+        else:
+            ssd = int(ssd_match.group(1))
+
+    # Article: "Z14V0008D"
+    article_match = re.search(r'\b([A-Z]\d{2}[A-Z0-9]{5,})\b', name)
+    article = article_match.group(1) if article_match else None
+
+    return {
+        'cpu': cpu,
+        'ram': ram,
+        'ssd': ssd,
+        'screen': screen,
+        'article': article
+    }
+
 # Извлекаем __NEXT_DATA__
 match = re.search(
     r'<script id="__NEXT_DATA__" type="application/json">(.+?)</script>',
@@ -210,15 +259,17 @@ if match:
         for key, value in props.items():
             if isinstance(value, dict) and "products" in value:
                 for item in value["products"]:
+                    name = item.get('name', '')
                     product = {
                         'id': item.get('id'),
-                        'name': item.get('name', ''),
+                        'name': name,
                         'price': item.get('price', {}).get('price', 0),
                         'old_price': item.get('price', {}).get('oldPrice'),
                         'available': item.get('isAvailable', False),
                         'rating': item.get('rating', {}).get('value'),
                         'reviews': item.get('rating', {}).get('reviewsCount'),
-                        'url': f"https://www.citilink.ru/product/{item.get('slug', '')}/" if item.get('slug') else None
+                        'url': f"https://www.citilink.ru/product/{item.get('slug', '')}/" if item.get('slug') else None,
+                        'specs': extract_specs(name)
                     }
                     result['products'].append(product)
     except json.JSONDecodeError as e:
@@ -234,7 +285,8 @@ if not result['products']:
         result['products'].append({
             'name': name,
             'price': int(price),
-            'available': True
+            'available': True,
+            'specs': extract_specs(name)
         })
 
 # Сохраняем JSON

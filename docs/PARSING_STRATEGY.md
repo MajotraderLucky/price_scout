@@ -1,27 +1,30 @@
 # Price Scout - Стратегия парсинга
 
-> Обновлено: 2026-01-02
+> Обновлено: 2026-01-04
 
-## Текущий статус: 8/8 магазинов работают
+## Текущий статус: 9 магазинов (8 стабильных + 1 нестабильный)
 
 ### Работающие магазины
 
-| Магазин       | Метод                 | Защита           | Время   | Статус   |
-|---------------|-----------------------|------------------|---------|----------|
-| DNS-Shop      | Firefox + xdotool     | Qrator (сложная) | 38.2s   | [+] PASS |
-| Ozon          | Firefox + xdotool     | Bot detection    | 52.4s   | [+] PASS |
-| i-ray.ru      | Playwright Direct     | Нет              | 4.1s    | [+] PASS |
-| Citilink      | Playwright + Stealth  | Rate Limit (429) | 14.5s   | [+] PASS |
-| nix.ru        | Playwright Direct     | Нет              | 3.6s    | [+] PASS |
-| regard.ru     | Playwright Stealth    | Bot detection    | 7.9s    | [+] PASS |
-| kns.ru        | Playwright Direct     | Нет              | 3.5s    | [+] PASS |
-| Yandex Market | Playwright + Stealth  | SmartCaptcha     | 15.4s   | [+] PASS |
+| Магазин       | Метод                 | Защита           | Время   | Статус       |
+|---------------|-----------------------|------------------|---------|--------------|
+| DNS-Shop      | Firefox + xdotool     | Qrator (сложная) | 38.2s   | [+] PASS     |
+| Ozon          | Firefox + xdotool     | Bot detection    | 52.4s   | [+] PASS     |
+| i-ray.ru      | Playwright Direct     | Нет              | 4.1s    | [+] PASS     |
+| Citilink      | Firefox + xdotool     | Rate Limit (429) | N/A     | [~] UNSTABLE |
+| nix.ru        | Playwright Direct     | Нет              | 3.6s    | [+] PASS     |
+| regard.ru     | Playwright Stealth    | Bot detection    | 7.9s    | [+] PASS     |
+| kns.ru        | Playwright Direct     | Нет              | 3.5s    | [+] PASS     |
+| Yandex Market | Playwright + Stealth  | SmartCaptcha     | 15.4s   | [+] PASS     |
+| Avito         | Firefox + xdotool     | Rate Limit       | 46.6s   | [+] PASS     |
+
+**Примечание:** Citilink исключен из регулярных тестов из-за агрессивного rate limiting.
+Тестируется только по запросу: `--store=citilink` с интервалом 5+ минут.
 
 ### Заблокированные магазины
 
 | Магазин       | Проблема           | Требуется        |
 |---------------|--------------------|------------------|
-| Avito         | IP блокировка      | Прокси           |
 | E-katalog.ru  | IP блокировка      | Локальный запуск |
 
 ---
@@ -221,11 +224,42 @@ count = data["catalog"]["count"]
 
 ---
 
+## Управление нестабильными магазинами
+
+### Citilink: Стратегия минимальной частоты
+
+**Проблема:**
+Citilink блокирует частые запросы даже с Firefox методом и увеличенными задержками.
+
+**Решение:**
+```bash
+# Исключить из регулярных тестов
+python test_scrapers.py --skip-unstable
+
+# Тестировать вручную с интервалом 5-10 минут
+python test_scrapers.py --store=citilink
+```
+
+**Рекомендации:**
+- Минимальный интервал между запросами: 5 минут
+- Не запускать в автоматических CI/CD пайплайнах
+- Использовать только для ручной проверки цен
+- Резидентный IP (домашний интернет) более надежен чем VPS
+
+**Альтернативы (будущее):**
+- Прокси-ротация с резидентными IP
+- Использование официального API Citilink (если появится)
+- Парсинг через мобильное приложение
+
+---
+
 ## Следующие шаги
 
 - [X] Добавить Ozon (Firefox метод)
 - [X] Добавить Yandex Market (Stealth метод)
+- [X] Добавить Avito (Firefox метод)
 - [X] Retry логика для Citilink (429)
-- [ ] Прокси для Avito
+- [X] Исключить Citilink из регулярных тестов (PS-20)
+- [ ] Прокси для нестабильных магазинов
 - [ ] Локальный запуск для E-katalog
 - [ ] Автоматический сбор цен по расписанию

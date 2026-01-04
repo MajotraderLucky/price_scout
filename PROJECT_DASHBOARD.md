@@ -32,6 +32,7 @@
 
 | ID    | Задача                                   | Дата       | Результат                        |
 |-------|------------------------------------------|------------|----------------------------------|
+| PS-20 | Управление Citilink Rate Limiting        | 2026-01-04 | Исключен из регулярных тестов    |
 | PS-19 | Фильтрация товаров по характеристикам    | 2026-01-03 | Phase 1: DNS specs filter (80%)  |
 | PS-18 | Исправить Citilink rate limiting         | 2026-01-03 | Задержки 90-210s, стабильно      |
 | PS-17 | Исправить парсер Avito                   | 2026-01-03 | Работает! 9/9 магазинов          |
@@ -114,19 +115,24 @@
 | Archbook | 91.122.50.46    | Ростелеком | [+] Working  |
 
 **Результаты unified test (test_scrapers.py):**
-| Магазин       | Цена        | Наличие | Время  | Метод                 | Статус   |
-|---------------|-------------|---------|--------|-----------------------|----------|
-| avito         | 51,799 RUB  | [+] Да  | 46.4s  | firefox+xvfb          | [+] PASS |
-| dns           | 62,799 RUB  | [+] Да  | 38.3s  | firefox+xvfb          | [+] PASS |
-| ozon          | 75,024 RUB  | [+] Да  | 52.4s  | ozon_firefox          | [+] PASS |
-| i-ray         | 107,999 RUB | [+] Да  | 3.5s   | playwright            | [+] PASS |
-| citilink      | 115,990 RUB | [+] Да  | 24.4s  | citilink_special      | [+] PASS |
-| nix           | 129,563 RUB | [-] Нет | 3.5s   | playwright            | [+] PASS |
-| regard        | 144,400 RUB | [+] Да  | 7.9s   | stealth               | [+] PASS |
-| kns           | 156,463 RUB | [-] Нет | 3.3s   | playwright            | [+] PASS |
-| yandex_market | 287,891 RUB | [+] Да  | 16.0s  | yandex_market_special | [+] PASS |
+| Магазин       | Цена        | Наличие | Время  | Метод                 | Статус       | Примечание              |
+|---------------|-------------|---------|--------|-----------------------|--------------|-------------------------|
+| avito         | 82,900 RUB  | [+] Да  | 46.6s  | avito_firefox         | [+] PASS     | Score: 80% (1/32)       |
+| dns           | 62,799 RUB  | [+] Да  | 38.3s  | firefox               | [+] PASS     | Score: 0% (0/18)        |
+| ozon          | 105,562 RUB | [+] Да  | 52.5s  | ozon_firefox          | [+] PASS     | Score: 0% (0/17)        |
+| i-ray         | 107,999 RUB | [+] Да  | 3.9s   | playwright_direct     | [+] PASS     | Score: 0% (0/1)         |
+| nix           | 129,563 RUB | [-] Нет | 3.8s   | playwright_direct     | [+] PASS     | Score: 0% (0/1)         |
+| regard        | 144,400 RUB | [+] Да  | 8.6s   | playwright_stealth    | [+] PASS     | Score: 0% (0/1)         |
+| kns           | 156,463 RUB | [-] Нет | 3.9s   | playwright_direct     | [+] PASS     | Score: 0% (0/1)         |
+| yandex_market | 181,550 RUB | [+] Да  | 15.4s  | yandex_market_special | [+] PASS     | Score: 10% (0/1)        |
+| citilink      | N/A         | [~] Да  | N/A    | citilink_firefox      | [~] UNSTABLE | Только --store=citilink |
 
-**Вывод:** ALL TESTS PASSED! 9/9 магазинов работают
+**Примечание:**
+- Citilink исключен из регулярных тестов из-за rate limiting
+- Для тестирования: `python test_scrapers.py --store=citilink` (интервал 5+ мин)
+- Остальные магазины: `python test_scrapers.py --skip-unstable`
+
+**Вывод:** 8/8 стабильных магазинов работают (Citilink UNSTABLE, тестируется вручную)
 
 **Текущие рабочие источники (10 магазинов):**
 
@@ -212,6 +218,57 @@
 ---
 
 ## Описание задач
+
+### PS-20: Управление Citilink Rate Limiting
+
+**Статус:** Complete (2026-01-04)
+
+**Проблема:**
+Citilink имеет агрессивный rate limiting на API уровне:
+- HTTP 200, но `effectorValues` пустой объект `{}`
+- Товары не загружаются при частых запросах (каждые 5-10 минут)
+- Firefox метод НЕ обходит ограничения - блокировка на уровне сервера
+- Надежность: 50-70% в зависимости от IP репутации и частоты запросов
+
+**Решение: Вариант 2 - Увеличенные интервалы**
+
+Исключить Citilink из регулярных полных тестов, тестировать только по запросу с интервалом 5+ минут.
+
+**Реализовано:**
+- [+] `unstable: bool = False` поле в StoreConfig dataclass
+- [+] `unstable=True` для Citilink конфигурации
+- [+] `--skip-unstable` флаг для пропуска нестабильных магазинов
+- [+] Обновлена `run_all_tests()` для обработки skip_unstable
+- [+] `--help` информация с примерами использования
+- [+] Документация API_ENDPOINTS.md - Citilink секция обновлена
+- [+] Документация PARSING_STRATEGY.md - новая секция "Управление нестабильными магазинами"
+- [+] Создан docs/CITILINK_USAGE.md - руководство оператора
+- [+] PROJECT_DASHBOARD.md обновлен с PS-20 задачей
+
+**Использование:**
+```bash
+# Стабильные магазины (8/8)
+python test_scrapers.py --skip-unstable
+
+# Citilink отдельно (интервал 5+ мин)
+python test_scrapers.py --store=citilink
+
+# Помощь
+python test_scrapers.py --help
+```
+
+**Файлы:**
+- scripts/test_scrapers.py:88 - StoreConfig.unstable поле
+- scripts/test_scrapers.py:122 - Citilink unstable=True
+- scripts/test_scrapers.py:1395 - run_all_tests() с skip_unstable
+- scripts/test_scrapers.py:1511 - --skip-unstable флаг парсинг
+- docs/API_ENDPOINTS.md:169-244 - Citilink Rate Limiting документация
+- docs/PARSING_STRATEGY.md:227-253 - Управление нестабильными магазинами
+- docs/CITILINK_USAGE.md - Полное руководство оператора
+
+**План:** ~/.claude/plans/cheerful-bubbling-catmull.md
+
+---
 
 ### PS-19: Фильтрация товаров по характеристикам
 
