@@ -397,7 +397,7 @@ def parse_dns_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]:
                     "total_products": len(products),
                 }
 
-        # Fallback to catalog.low_price (legacy behavior)
+        # Fallback to catalog.low_price (DNS products don't have prices)
         catalog = data.get("catalog", {})
         if catalog.get("low_price"):
             return {
@@ -405,6 +405,9 @@ def parse_dns_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]:
                 "available": True,
                 "name": catalog.get("name", ""),
                 "count": catalog.get("count", 0),
+                "match_score": 0,
+                "matched_products": 0,
+                "total_products": len(products),
             }
     except Exception as e:
         print(f"Error parsing DNS JSON: {e}")
@@ -443,7 +446,7 @@ def parse_avito_json(json_path: str, filter_specs: bool = True) -> Optional[Dict
                     "total_products": len(products),
                 }
 
-        # Fallback to legacy behavior (MIN price)
+        # Fallback to legacy behavior (MIN price) - no products passed threshold
         if products:
             prices = [p["price"] for p in products if p.get("price")]
             if prices:
@@ -451,6 +454,9 @@ def parse_avito_json(json_path: str, filter_specs: bool = True) -> Optional[Dict
                     "price": min(prices),
                     "available": True,
                     "count": len(products),
+                    "match_score": 0,
+                    "matched_products": 0,
+                    "total_products": len(products),
                 }
     except Exception as e:
         print(f"Error parsing Avito JSON: {e}")
@@ -536,7 +542,7 @@ def parse_ozon_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]
                     "total_products": len(products),
                 }
 
-        # Fallback to legacy behavior (MIN price)
+        # Fallback to legacy behavior (MIN price) - no products passed threshold
         if products:
             prices = [p["price"] for p in products if p.get("price")]
             if prices:
@@ -544,6 +550,9 @@ def parse_ozon_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]
                     "price": min(prices),
                     "available": True,
                     "count": len(products),
+                    "match_score": 0,
+                    "matched_products": 0,
+                    "total_products": len(products),
                 }
     except Exception as e:
         print(f"Error parsing Ozon JSON: {e}")
@@ -615,6 +624,9 @@ def test_playwright_direct(store: StoreConfig, query: str) -> TestResult:
                 result.details["product_name"] = product_name
                 result.details["match_score"] = match_score
                 result.details["specs"] = specs
+                # Set matched/total for display
+                result.details["matched_products"] = 1 if match_score >= 80 else 0
+                result.details["total_products"] = 1
 
             if result.price:
                 result.status = "PASS"
@@ -730,6 +742,9 @@ def test_playwright_stealth(store: StoreConfig, query: str) -> TestResult:
                     result.details["product_name"] = product_name
                     result.details["match_score"] = match_score
                     result.details["specs"] = specs
+                    # Set matched/total for display
+                    result.details["matched_products"] = 1 if match_score >= 80 else 0
+                    result.details["total_products"] = 1
 
             if result.price:
                 result.status = "PASS"
@@ -1246,6 +1261,9 @@ def test_yandex_market_special(store: StoreConfig, query: str) -> TestResult:
                     result.details["product_name"] = product_name
                     result.details["match_score"] = match_score
                     result.details["specs"] = specs
+                    # Set matched/total for display
+                    result.details["matched_products"] = 1 if match_score >= 80 else 0
+                    result.details["total_products"] = 1
 
                 result.status = "PASS"
             else:
