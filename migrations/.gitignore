@@ -1,0 +1,11 @@
+# Migration backups and temporary files
+*.dump
+*.backup
+*.bak
+*.tmp
+
+# Environment-specific config
+local_config.sh
+
+# Logs
+*.log

@@ -1,0 +1,23 @@
+[package]
+name = "price-scout-bot"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "price-scout-bot"
+path = "src/main.rs"
+
+[dependencies]
+price-scout-models = { path = "../models" }
+price-scout-db = { path = "../db" }
+
+tokio = { workspace = true }
+teloxide = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenv = { workspace = true }

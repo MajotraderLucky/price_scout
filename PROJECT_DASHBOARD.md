@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-03
+> Последнее обновление: 2026-01-04
 
 ---
 
@@ -32,6 +32,9 @@
 
 | ID    | Задача                                   | Дата       | Результат                        |
 |-------|------------------------------------------|------------|----------------------------------|
+| PS-23 | Python Bridge Implementation             | 2026-01-04 | Rust-Python subprocess bridge    |
+| PS-22 | Rust Workspace Bootstrap                 | 2026-01-04 | 5 crates, 335 dependencies       |
+| PS-21 | PostgreSQL Schema Implementation         | 2026-01-04 | 7 tables, migrations applied     |
 | PS-20 | Управление Citilink Rate Limiting        | 2026-01-04 | Исключен из регулярных тестов    |
 | PS-19 | Фильтрация товаров по характеристикам    | 2026-01-03 | Phase 1: DNS specs filter (80%)  |
 | PS-18 | Исправить Citilink rate limiting         | 2026-01-03 | Задержки 90-210s, стабильно      |
@@ -98,9 +101,9 @@
 | Задач в Backlog      | 5                  |
 | Задач In Progress    | 0                  |
 | Задач в Review       | 2                  |
-| Задач Done           | 12                 |
-| Python скриптов      | 20                 |
-| Документов           | 11                 |
+| Задач Done           | 15                 |
+| Python скриптов      | 22                 |
+| Документов           | 14                 |
 
 ---
 
@@ -189,6 +192,9 @@
 
 | Дата       | Изменение                                                   |
 |------------|-------------------------------------------------------------|
+| 2026-01-04 | PS-23: Python Bridge - Rust-Python subprocess communication |
+| 2026-01-04 | PS-22: Rust workspace initialized - 5 crates compiled       |
+| 2026-01-04 | PS-21: PostgreSQL schema created - 7 tables, 9 stores       |
 | 2026-01-03 | Citilink rate limiting исправлен! Задержки 90-210s, 24.4s   |
 | 2026-01-03 | Avito работает! Исправлен парсер, 9/9 магазинов, 51,799 RUB |
 | 2026-01-02 | Ozon добавлен! 75,024 RUB через Firefox, 8/9 магазинов      |
@@ -317,6 +323,133 @@ python test_scrapers.py --help
 - [ ] Smart search комбинация (article → specs filter)
 
 **План:** `/home/ryazanov/.claude/plans/cheerful-bubbling-catmull.md`
+
+---
+
+### PS-21: PostgreSQL Schema Implementation
+
+**Статус:** Complete (2026-01-04)
+
+**Цель:** Создать production-ready PostgreSQL схему для price tracking системы.
+
+**Реализовано:**
+- [+] `migrations/001_initial_schema.sql` - Полная схема БД (360 строк)
+- [+] `migrations/002_seed_stores.sql` - Seed данные для 9 магазинов
+- [+] `migrations/apply_migrations.sh` - Скрипт применения миграций
+- [+] `migrations/README.md` - Документация
+- [+] Применены на Archbook через Ansible
+
+**Схема:**
+- 7 таблиц: users, stores, products, store_prices, price_history, trackings, scraping_jobs
+- 2 view: best_prices_view, product_price_stats
+- 2 триггера: auto_archive_price_history, update_product_timestamp
+- Индексы для производительности
+- JSONB для гибких характеристик товаров
+
+**Результат:**
+```sql
+Database: price_scout
+Tables created: 7
+Views created: 2
+Stores seeded: 9 (8 stable, 1 unstable)
+PostgreSQL version: 17.5
+Server: Archbook (192.168.0.10)
+```
+
+**Файлы:**
+- `/home/ryazanov/Development/price_scout/migrations/001_initial_schema.sql`
+- `/home/ryazanov/Development/price_scout/migrations/002_seed_stores.sql`
+- `/home/ryazanov/Development/price_scout/migrations/MIGRATION_REPORT.md`
+
+---
+
+### PS-22: Rust Workspace Bootstrap
+
+**Статус:** Complete (2026-01-04)
+
+**Цель:** Инициализировать Rust workspace с 5 crates для hybrid Rust+Python архитектуры.
+
+**Реализовано:**
+- [+] `Cargo.toml` - Workspace configuration
+- [+] `crates/models/` - Shared data models (User, Store, Product, StorePrice, etc.)
+- [+] `crates/db/` - Database layer (sqlx, connection pooling, operations)
+- [+] `crates/api/` - API server placeholder (Axum)
+- [+] `crates/bot/` - Telegram bot placeholder (teloxide)
+- [+] `crates/scraper/` - Scraper orchestration + Python bridge placeholder
+- [+] `README_RUST.md` - Rust documentation
+- [+] `.env.example` - Environment variables
+
+**Dependencies:**
+- tokio 1.42 (async runtime)
+- sqlx 0.8 (PostgreSQL driver)
+- axum 0.7 (HTTP server)
+- teloxide 0.13 (Telegram bot)
+- serde, chrono, anyhow, tracing
+
+**Результат:**
+```bash
+Workspace compiled: SUCCESS
+Crates: 5
+Dependencies loaded: 335
+Build time: 24.3s (clean)
+Check time: 5.7s
+```
+
+**Файлы:**
+- `/home/ryazanov/Development/price_scout/Cargo.toml`
+- `/home/ryazanov/Development/price_scout/README_RUST.md`
+- `/home/ryazanov/Development/price_scout/RUST_WORKSPACE_REPORT.md`
+
+---
+
+### PS-23: Python Bridge Implementation
+
+**Статус:** Complete (2026-01-04)
+
+**Цель:** Реализовать Rust ↔ Python bridge для вызова Python scrapers из Rust.
+
+**Реализовано:**
+- [+] `scripts/test_scrapers.py` - Added `output_json()` function with `--json` flag
+- [+] `crates/scraper/src/python_bridge.rs` - Main bridge implementation (199 lines)
+- [+] `run_python_scraper()` - Subprocess spawn + JSON parsing
+- [+] `run_python_scraper_with_timeout()` - Custom timeout variant
+- [+] Error handling (script not found, execution errors, timeout, JSON parse)
+- [+] Test examples: `test_bridge_minimal.rs`, `test_python_bridge.rs`
+- [+] Updated `ScraperResponse` model with `method` field
+
+**Архитектура:**
+```
+Rust Application
+  ↓ ScraperRequest {store, query, method}
+run_python_scraper()
+  ↓ subprocess: python3 test_scrapers.py --json --store=X
+Python Script
+  ↓ stdout: JSON
+serde_json::from_str()
+  ↓ ScraperResponse {store, status, price, count, time, error, method}
+Rust Application
+```
+
+**Тестирование:**
+```
+[+] Subprocess spawn: OK
+[+] JSON output: OK
+[+] JSON parsing: OK
+[+] Data extraction: OK
+[+] Error handling: OK
+```
+
+**Performance:**
+- Subprocess overhead: ~150-300ms
+- JSON parsing: ~1ms
+- Total overhead minimal compared to scraping time (3-60s)
+
+**Файлы:**
+- `/home/ryazanov/Development/price_scout/crates/scraper/src/python_bridge.rs`
+- `/home/ryazanov/Development/price_scout/crates/scraper/examples/test_bridge_minimal.rs`
+- `/home/ryazanov/Development/price_scout/PYTHON_BRIDGE_REPORT.md`
+
+**Следующий шаг:** PS-29 - Scraper Orchestration (Worker + Queue)
 
 ---
 

@@ -1,0 +1,22 @@
+[package]
+name = "price-scout-db"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+price-scout-models = { path = "../models" }
+
+tokio = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+dotenv = { workspace = true }
+tracing-subscriber = { workspace = true }

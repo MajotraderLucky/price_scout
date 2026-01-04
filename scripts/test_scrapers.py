@@ -1509,10 +1509,56 @@ def save_results(results: List[TestResult], output_path: Path):
     print(f"\nResults saved: {output_path}")
 
 
+def output_json(results: List[TestResult], query: str):
+    """Output results as JSON for Rust consumption"""
+    if len(results) == 1:
+        # Single result - output single object
+        result = results[0]
+        output = {
+            "store": result.store,
+            "status": result.status,
+            "price": result.price,
+            "count": result.count,
+            "time": result.time,
+            "error": result.error,
+            "method": result.method,
+        }
+    else:
+        # Multiple results - output array
+        output = {
+            "query": query,
+            "timestamp": datetime.now().isoformat(),
+            "results": [
+                {
+                    "store": r.store,
+                    "status": r.status,
+                    "price": r.price,
+                    "count": r.count,
+                    "time": r.time,
+                    "error": r.error,
+                    "method": r.method,
+                }
+                for r in results
+            ],
+            "summary": {
+                "total": len(results),
+                "passed": len([r for r in results if r.status == "PASS"]),
+                "failed": len([r for r in results if r.status == "FAIL"]),
+                "skipped": len([r for r in results if r.status == "SKIP"]),
+            }
+        }
+
+    print(json.dumps(output, ensure_ascii=False, indent=2))
+
+
 def main():
-    print("=" * 70)
-    print("PRICE SCOUT - Scraper Test System")
-    print("=" * 70)
+    # Check for JSON mode first (suppress all other output)
+    json_mode = "--json" in sys.argv
+
+    if not json_mode:
+        print("=" * 70)
+        print("PRICE SCOUT - Scraper Test System")
+        print("=" * 70)
 
     # Help message
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -1521,17 +1567,20 @@ def main():
         print("  python test_scrapers.py --quick            # Skip Firefox methods")
         print("  python test_scrapers.py --skip-unstable    # Skip unstable stores (Citilink)")
         print("  python test_scrapers.py --store=citilink   # Test only Citilink")
+        print("  python test_scrapers.py --json --store=dns # JSON output for Rust bridge")
         print("")
         print("Options:")
         print("  --help, -h         Show this help message")
         print("  --quick            Skip Firefox-based tests (faster)")
         print("  --skip-unstable    Skip stores with rate limiting issues")
         print("  --store=NAME       Test only specific store")
+        print("  --json             Output results as JSON (for Rust bridge)")
         print("")
         return
 
-    print(f"Test article: {TEST_ARTICLE}")
-    print(f"Test product: {TEST_PRODUCT}")
+    if not json_mode:
+        print(f"Test article: {TEST_ARTICLE}")
+        print(f"Test product: {TEST_PRODUCT}")
 
     # Аргументы
     skip_firefox = "--quick" in sys.argv
@@ -1544,26 +1593,32 @@ def main():
         elif arg == "--store" and sys.argv.index(arg) + 1 < len(sys.argv):
             store_filter = sys.argv[sys.argv.index(arg) + 1]
 
-    if skip_firefox:
-        print("Mode: QUICK (skipping Firefox tests)")
-    if skip_unstable:
-        print("Mode: STABLE-ONLY (skipping unstable stores)")
-    if store_filter:
-        print(f"Filter: {store_filter}")
+    if not json_mode:
+        if skip_firefox:
+            print("Mode: QUICK (skipping Firefox tests)")
+        if skip_unstable:
+            print("Mode: STABLE-ONLY (skipping unstable stores)")
+        if store_filter:
+            print(f"Filter: {store_filter}")
 
-    print(f"Stores to test: {len([s for s in STORES if not store_filter or s.name == store_filter])}")
+        print(f"Stores to test: {len([s for s in STORES if not store_filter or s.name == store_filter])}")
 
     # Запуск тестов
     results = run_all_tests(TEST_ARTICLE, skip_firefox=skip_firefox, skip_unstable=skip_unstable, store_filter=store_filter)
 
-    # Сводка
-    print_summary(results)
+    # Output based on mode
+    if json_mode:
+        # JSON mode - output only JSON to stdout
+        output_json(results, TEST_ARTICLE)
+    else:
+        # Normal mode - human-readable output
+        print_summary(results)
 
-    # Сохранение
-    output_dir = Path(__file__).parent.parent / "data"
-    output_dir.mkdir(exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_results(results, output_dir / f"test_results_{timestamp}.json")
+        # Сохранение
+        output_dir = Path(__file__).parent.parent / "data"
+        output_dir.mkdir(exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_results(results, output_dir / f"test_results_{timestamp}.json")
 
     # Exit code
     passed_count = len([r for r in results if r.status == "PASS"])
