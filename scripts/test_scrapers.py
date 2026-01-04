@@ -34,16 +34,16 @@ from specs_filter import TargetSpecs, filter_and_rank
 
 # === Конфигурация тестов ===
 
-TEST_ARTICLE = "Z14V0008D"
-TEST_PRODUCT = "MacBook Pro 16 M1 Pro 32GB 512GB"
+TEST_ARTICLE = ""  # No specific article - search by specs
+TEST_PRODUCT = "MacBook Pro 16\" M1 (or newer) 16GB+"
 
-# Target specifications for filtering
+# Target specifications for filtering (minimum requirements)
 TARGET_SPECS = TargetSpecs(
     screen="16",
-    cpu="M1 Pro",
-    ram=32,
-    ssd=512,
-    article="Z14V0008D"
+    cpu="M1",      # M1, M1 Pro, M1 Max, or newer (M2, M3, M4...)
+    ram=16,        # Minimum 16GB (will match 16, 18, 24, 32, etc.)
+    ssd=256,       # Minimum 256GB
+    article=""     # No specific article
 )
 
 # Ожидаемый диапазон цен для валидации
@@ -384,7 +384,7 @@ def parse_dns_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]:
 
         if products and filter_specs:
             # Apply specs filtering
-            filtered = filter_and_rank(products, TARGET_SPECS, threshold=80, top_n=3)
+            filtered = filter_and_rank(products, TARGET_SPECS, threshold=70, top_n=3)
 
             if filtered:
                 best_product, best_score = filtered[0]
@@ -433,7 +433,7 @@ def parse_avito_json(json_path: str, filter_specs: bool = True) -> Optional[Dict
 
         if products and filter_specs:
             # Apply specs filtering
-            filtered = filter_and_rank(products, TARGET_SPECS, threshold=80, top_n=3)
+            filtered = filter_and_rank(products, TARGET_SPECS, threshold=70, top_n=3)
 
             if filtered:
                 best_product, best_score = filtered[0]
@@ -482,7 +482,7 @@ def parse_citilink_json(json_path: str, filter_specs: bool = True) -> Optional[D
 
         if products and filter_specs:
             # Apply specs filtering
-            filtered = filter_and_rank(products, TARGET_SPECS, threshold=80, top_n=3)
+            filtered = filter_and_rank(products, TARGET_SPECS, threshold=70, top_n=3)
 
             if filtered:
                 best_product, best_score = filtered[0]
@@ -532,7 +532,7 @@ def parse_ozon_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]
 
         if products and filter_specs:
             # Apply specs filtering
-            filtered = filter_and_rank(products, TARGET_SPECS, threshold=80, top_n=3)
+            filtered = filter_and_rank(products, TARGET_SPECS, threshold=70, top_n=3)
 
             if filtered:
                 best_product, best_score = filtered[0]

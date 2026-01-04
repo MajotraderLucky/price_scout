@@ -126,9 +126,9 @@ def calculate_match_score(specs: ProductSpecs, target: TargetSpecs) -> float:
 
     Scoring weights:
     - Article match: 100% (instant perfect match)
-    - CPU: 40% (full match), 20% (same family: M1 Pro vs M1 Max)
-    - RAM: 30% (exact), 15% (within 8GB)
-    - SSD: 20% (exact), 10% (within 256GB)
+    - CPU: 40% (same generation+variant), 30% (same generation, e.g., M4 vs M4 Pro)
+    - RAM: 30% (>= target), 15% (>= target-8GB)
+    - SSD: 20% (>= target), 10% (>= target-256GB)
     - Screen: 10% (exact)
 
     Args:
@@ -139,10 +139,10 @@ def calculate_match_score(specs: ProductSpecs, target: TargetSpecs) -> float:
         Match score from 0.0 to 100.0
 
     Examples:
-        >>> specs = ProductSpecs(cpu="M1 Pro", ram=32, ssd=512, screen="16")
-        >>> target = TargetSpecs(cpu="M1 Pro", ram=32, ssd=512, screen="16")
+        >>> specs = ProductSpecs(cpu="M4 Pro", ram=24, ssd=512, screen="16")
+        >>> target = TargetSpecs(cpu="M4", ram=16, ssd=512, screen="16")
         >>> calculate_match_score(specs, target)
-        100.0
+        100.0  # M4 Pro >= M4, 24GB >= 16GB, 512GB == 512GB, screen match
     """
     # Perfect match by article number
     if specs.article and specs.article == target.article:
@@ -150,25 +150,41 @@ def calculate_match_score(specs: ProductSpecs, target: TargetSpecs) -> float:
 
     score = 0.0
 
-    # CPU match (40% weight)
+    # CPU match (40% weight) - supports minimum generation requirement
     if specs.cpu and target.cpu:
-        if specs.cpu == target.cpu:
-            score += 40.0
-        elif specs.cpu.startswith(target.cpu.split()[0]):  # Same family: M1 Pro vs M1 Max
-            score += 20.0
+        # Extract generation: "M4 Pro" -> "M4", "M1" -> "M1"
+        target_gen = target.cpu.split()[0]  # "M4", "M1", etc.
+        specs_gen = specs.cpu.split()[0] if specs.cpu else None
 
-    # RAM match (30% weight)
-    if specs.ram and target.ram:
-        if specs.ram == target.ram:
+        if specs.cpu == target.cpu:
+            # Exact match: M4 Pro == M4 Pro
+            score += 40.0
+        elif specs_gen == target_gen:
+            # Same generation, different variant: M4 Pro when looking for M4
             score += 30.0
-        elif abs(specs.ram - target.ram) <= 8:  # Within 8GB tolerance
+        elif specs_gen and target_gen:
+            # Different generation - check if newer
+            # Extract number: M4 -> 4
+            try:
+                specs_num = int(re.search(r'M(\d+)', specs_gen).group(1))
+                target_num = int(re.search(r'M(\d+)', target_gen).group(1))
+                if specs_num >= target_num:
+                    score += 20.0  # Newer generation
+            except:
+                pass
+
+    # RAM match (30% weight) - supports minimum requirement (>=)
+    if specs.ram and target.ram:
+        if specs.ram >= target.ram:
+            score += 30.0
+        elif specs.ram >= target.ram - 8:  # Within 8GB below target
             score += 15.0
 
-    # SSD match (20% weight)
+    # SSD match (20% weight) - supports minimum requirement (>=)
     if specs.ssd and target.ssd:
-        if specs.ssd == target.ssd:
+        if specs.ssd >= target.ssd:
             score += 20.0
-        elif abs(specs.ssd - target.ssd) <= 256:  # Within 256GB tolerance
+        elif specs.ssd >= target.ssd - 256:  # Within 256GB below target
             score += 10.0
 
     # Screen match (10% weight)
