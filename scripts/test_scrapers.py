@@ -1452,7 +1452,7 @@ def print_summary(results: List[TestResult]):
             base_info = f"  {r.store}: {format_price(r.price)} {avail} ({r.response_time:.1f}s)"
 
             # Add match score if available (for filtered results)
-            if r.details.get("match_score"):
+            if "match_score" in r.details:
                 score = r.details["match_score"]
                 matched = r.details.get("matched_products", 0)
                 total = r.details.get("total_products", 0)
