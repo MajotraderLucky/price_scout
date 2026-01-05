@@ -136,10 +136,10 @@ impl Database {
     }
 
     /// Get product by ID
-    pub async fn get_product(&self, id: i64) -> Result<Product> {
+    pub async fn get_product(&self, id: i64) -> Result<Option<Product>> {
         let product = sqlx::query_as::<_, Product>("SELECT * FROM products WHERE id = $1")
             .bind(id)
-            .fetch_one(&self.pool)
+            .fetch_optional(&self.pool)
             .await
             .context("Failed to fetch product")?;
 

@@ -170,8 +170,8 @@ impl ScraperWorker {
             .queue
             .db()
             .get_product(job.product_id)
-            .await
-            .context(format!("Product {} not found", job.product_id))?;
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Product {} not found", job.product_id))?;
 
         // Determine query (use search_query if available, otherwise product name)
         let query = product

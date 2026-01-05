@@ -4,7 +4,6 @@
 //! Jobs are stored in PostgreSQL and processed by workers.
 
 use anyhow::{Context, Result};
-use chrono::Utc;
 use price_scout_db::Database;
 use price_scout_models::ScrapingJob;
 use sqlx::Row;
@@ -281,7 +280,7 @@ impl ScraperQueue {
 }
 
 /// Job queue statistics
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct JobStats {
     pub pending: i64,
     pub running: i64,
