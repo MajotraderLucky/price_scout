@@ -32,6 +32,7 @@
 
 | ID    | Задача                                   | Дата       | Результат                        |
 |-------|------------------------------------------|------------|----------------------------------|
+| PS-29 | Scraper Orchestration (Queue + Worker)   | 2026-01-04 | Job queue + background worker    |
 | PS-23 | Python Bridge Implementation             | 2026-01-04 | Rust-Python subprocess bridge    |
 | PS-22 | Rust Workspace Bootstrap                 | 2026-01-04 | 5 crates, 335 dependencies       |
 | PS-21 | PostgreSQL Schema Implementation         | 2026-01-04 | 7 tables, migrations applied     |
@@ -101,9 +102,10 @@
 | Задач в Backlog      | 5                  |
 | Задач In Progress    | 0                  |
 | Задач в Review       | 2                  |
-| Задач Done           | 15                 |
+| Задач Done           | 16                 |
 | Python скриптов      | 22                 |
-| Документов           | 14                 |
+| Rust modules         | 8                  |
+| Документов           | 15                 |
 
 ---
 
@@ -192,6 +194,7 @@
 
 | Дата       | Изменение                                                   |
 |------------|-------------------------------------------------------------|
+| 2026-01-04 | PS-29: Scraper Orchestration - Queue + Worker (1,770 lines) |
 | 2026-01-04 | PS-23: Python Bridge - Rust-Python subprocess communication |
 | 2026-01-04 | PS-22: Rust workspace initialized - 5 crates compiled       |
 | 2026-01-04 | PS-21: PostgreSQL schema created - 7 tables, 9 stores       |
@@ -449,7 +452,84 @@ Rust Application
 - `/home/ryazanov/Development/price_scout/crates/scraper/examples/test_bridge_minimal.rs`
 - `/home/ryazanov/Development/price_scout/PYTHON_BRIDGE_REPORT.md`
 
-**Следующий шаг:** PS-29 - Scraper Orchestration (Worker + Queue)
+**Следующий шаг:** PS-28 - API Server (Axum), PS-30 - Telegram Bot
+
+---
+
+### PS-29: Scraper Orchestration (Queue + Worker)
+
+**Статус:** Complete (2026-01-04)
+
+**Цель:** Реализовать систему оркестрации скрейперов с очередью заданий и фоновым воркером.
+
+**Реализовано:**
+- [+] `crates/scraper/src/queue.rs` - Управление очередью заданий (298 строк)
+- [+] `crates/scraper/src/worker.rs` - Фоновый воркер обработки (378 строк)
+- [+] `crates/scraper/examples/test_worker.rs` - Интеграционный тест (194 строки)
+- [+] `PS29_ORCHESTRATION_REPORT.md` - Полная документация (900+ строк)
+
+**ScraperQueue - Управление очередью:**
+- Постановка заданий в очередь с приоритетами (enqueue, enqueue_all_stores)
+- Получение pending заданий с сортировкой
+- Управление статусами (pending → running → completed/failed)
+- Повтор неудачных заданий с задержкой
+- Статистика очереди (pending/running/completed/failed)
+- Очистка старых заданий
+
+**ScraperWorker - Фоновый воркер:**
+- Непрерывный цикл опроса с конфигурируемыми интервалами
+- Пакетная обработка заданий (batch_size)
+- Поиск продуктов и магазинов
+- Вызов Python скрейперов через bridge
+- Сохранение результатов в БД (upsert store_prices)
+- Обработка ошибок
+- Graceful shutdown через Arc<AtomicBool>
+
+**WorkerConfig:**
+```rust
+batch_size: 10           // Заданий за раз
+poll_interval: 5s        // Задержка при отсутствии заданий
+max_retries: 3          // Максимум попыток
+scraper_timeout: 120s   // Таймаут на задание
+```
+
+**Архитектура:**
+```
+Application → ScraperQueue → ScraperWorker → Python Bridge → Scrapers
+           (PostgreSQL)    (Background)     (Subprocess)    (Python)
+```
+
+**Workflow:**
+1. API/Bot вызывает queue.enqueue() или enqueue_all_stores()
+2. Worker опрашивает get_pending_jobs()
+3. Для каждого задания:
+   - Получает product и store из БД
+   - Вызывает run_python_scraper()
+   - Парсит JSON ответ
+   - Сохраняет StorePrice в БД
+   - Обновляет статус задания
+
+**Результат:**
+```bash
+cargo check --workspace
+Finished in 2.85s - SUCCESS
+```
+
+**Deployment:**
+- Systemd service: price-scout-worker.service
+- Множественные воркеры для параллельной обработки
+- Мониторинг через queue.get_stats()
+
+**Файлы:**
+- `/home/ryazanov/Development/price_scout/crates/scraper/src/queue.rs`
+- `/home/ryazanov/Development/price_scout/crates/scraper/src/worker.rs`
+- `/home/ryazanov/Development/price_scout/crates/scraper/examples/test_worker.rs`
+- `/home/ryazanov/Development/price_scout/PS29_ORCHESTRATION_REPORT.md`
+
+**Следующие задачи:**
+- PS-28: API Server (Axum REST endpoints)
+- PS-30: Telegram Bot (teloxide integration)
+- Phase 2: Retry logic, parallel workers, monitoring
 
 ---
 
