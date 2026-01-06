@@ -17,6 +17,7 @@ ALTER SEQUENCE stores_id_seq RESTART WITH 1;
 
 -- Insert stable stores (unstable=false)
 INSERT INTO stores (name, base_url, method, parser, unstable) VALUES
+('centershot', 'https://www.centershot.ru', 'playwright_direct', 'centershot', false),
 ('dns', 'https://www.dns-shop.ru', 'firefox', 'dns_json', false),
 ('ozon', 'https://www.ozon.ru', 'ozon_firefox', 'generic', false),
 ('i-ray', 'https://i-ray.ru', 'playwright_direct', 'generic', false),
@@ -35,7 +36,7 @@ INSERT INTO stores (name, base_url, method, parser, unstable) VALUES
 -- STORE DETAILS
 -- ============================================================================
 
-COMMENT ON TABLE stores IS 'Updated: 2026-01-05 - 10 stores total (8 stable + 2 unstable)';
+COMMENT ON TABLE stores IS 'Updated: 2026-01-06 - 11 stores total (9 stable + 2 unstable)';
 
 -- Verification query
 DO $$
@@ -56,18 +57,19 @@ BEGIN
     RAISE NOTICE 'Unstable stores: %', unstable_count;
     RAISE NOTICE '';
     RAISE NOTICE 'Stable stores:';
-    RAISE NOTICE '  1. dns (Firefox + xdotool, 38.2s)';
-    RAISE NOTICE '  2. ozon (Firefox + xdotool, 52.4s)';
-    RAISE NOTICE '  3. i-ray (Playwright Direct, 4.1s)';
-    RAISE NOTICE '  4. nix (Playwright Direct, 3.6s)';
-    RAISE NOTICE '  5. regard (Playwright Stealth, 7.9s)';
-    RAISE NOTICE '  6. kns (Playwright Direct, 3.5s)';
-    RAISE NOTICE '  7. yandex_market (Playwright Stealth, 15.4s)';
-    RAISE NOTICE '  8. avito (Firefox + xdotool, 46.6s)';
+    RAISE NOTICE '  1. centershot (Playwright Direct, ~4s)';
+    RAISE NOTICE '  2. dns (Firefox + xdotool, 38.2s)';
+    RAISE NOTICE '  3. ozon (Firefox + xdotool, 52.4s)';
+    RAISE NOTICE '  4. i-ray (Playwright Direct, 4.1s)';
+    RAISE NOTICE '  5. nix (Playwright Direct, 3.6s)';
+    RAISE NOTICE '  6. regard (Playwright Stealth, 7.9s)';
+    RAISE NOTICE '  7. kns (Playwright Direct, 3.5s)';
+    RAISE NOTICE '  8. yandex_market (Playwright Stealth, 15.4s)';
+    RAISE NOTICE '  9. avito (Firefox + xdotool, 46.6s)';
     RAISE NOTICE '';
     RAISE NOTICE 'Unstable stores:';
-    RAISE NOTICE '  9. citilink (Rate limiting, manual testing only)';
-    RAISE NOTICE ' 10. aliexpress (Aggressive protection, manual testing initially)';
+    RAISE NOTICE ' 10. citilink (Rate limiting, manual testing only)';
+    RAISE NOTICE ' 11. aliexpress (Aggressive protection, manual testing initially)';
     RAISE NOTICE '========================================';
 END $$;
 

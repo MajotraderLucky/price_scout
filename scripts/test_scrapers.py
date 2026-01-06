@@ -92,6 +92,13 @@ class StoreConfig:
 
 STORES: List[StoreConfig] = [
     StoreConfig(
+        name="centershot",
+        method="playwright_direct",
+        search_url="https://www.centershot.ru/search/?q={query}",
+        parser="centershot",
+        validate_price=False,  # Different price range (small items)
+    ),
+    StoreConfig(
         name="i-ray",
         method="playwright_direct",
         search_url="https://i-ray.ru/search?q={query}",
@@ -314,6 +321,66 @@ def extract_specs_from_name(name: str) -> dict:
         'screen': screen,
         'article': article
     }
+
+
+def parse_centershot(html: str) -> Optional[Dict]:
+    """Парсинг Centershot.ru - магазин рогаток и охотничьих аксессуаров"""
+
+    # Priority 1: CSS selector .product-purchase_price-value (most reliable for product page)
+    # Contains "1 900 ₽" or "1 900 &#8381;" format
+    css_prices = []
+    for match in re.finditer(r'product-purchase_price-value[^>]*>([^<]+)<', html):
+        price_text = match.group(1)
+        # Clean: "1 900 ₽" or "1 900 &#8381;" -> "1900"
+        clean = re.sub(r'[^\d]', '', price_text)
+        if clean.isdigit():
+            price = int(clean)
+            if 100 < price < 100000:  # Price range for small items (100-100K RUB)
+                css_prices.append(price)
+
+    if css_prices:
+        return {
+            "price": min(css_prices),
+            "available": True,
+            "name": "",
+            "count": len(set(css_prices)),
+        }
+
+    # Priority 2: Schema.org with reasonable price range
+    schema_prices = []
+    for match in re.finditer(r'itemprop="price"\s+content="(\d+)"', html):
+        price = int(match.group(1))
+        if 100 < price < 100000:
+            schema_prices.append(price)
+
+    if schema_prices:
+        return {
+            "price": min(schema_prices),
+            "available": True,
+            "name": "",
+            "count": len(set(schema_prices)),
+        }
+
+    # Fallback: Generic price pattern for search page (less reliable)
+    # Format: "1 900 ₽" or "1900₽" or "1 900 &#8381;"
+    # Only use prices > 500 RUB to filter out shipping costs
+    generic_prices = []
+    for match in re.findall(r'(\d[\d\s\u00a0]*\d)\s*(?:₽|руб|&#8381;)', html):
+        clean = re.sub(r'[\s\u00a0]', '', match)
+        if clean.isdigit():
+            price = int(clean)
+            if 500 < price < 100000:  # Higher threshold to filter shipping costs
+                generic_prices.append(price)
+
+    if generic_prices:
+        return {
+            "price": min(generic_prices),
+            "available": True,
+            "name": "",
+            "count": len(set(generic_prices)),
+        }
+
+    return None
 
 
 def parse_avito(html: str) -> Optional[Dict]:
@@ -764,9 +831,15 @@ def test_playwright_direct(store: StoreConfig, query: str) -> TestResult:
                 result.error = "CAPTCHA detected"
                 return result
 
-            # Извлечение данных
-            result.price = extract_price(html)
-            result.available = extract_availability(html)
+            # Извлечение данных (с учетом типа парсера)
+            if store.parser == "centershot":
+                parsed = parse_centershot(html)
+                if parsed:
+                    result.price = parsed["price"]
+                    result.available = parsed["available"]
+            else:
+                result.price = extract_price(html)
+                result.available = extract_availability(html)
 
             # Извлечение названия и specs для фильтрации
             product_name = extract_product_name(html)
