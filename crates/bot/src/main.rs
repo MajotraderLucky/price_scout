@@ -56,6 +56,25 @@ struct ModelAccuracy {
     mae_rub: f64,
 }
 
+/// Web search response from Python script
+#[derive(Debug, Serialize, Deserialize)]
+struct WebSearchResponse {
+    query: String,
+    results: Vec<WebSearchResult>,
+    error: Option<String>,
+}
+
+/// Single web search result
+#[derive(Debug, Serialize, Deserialize)]
+struct WebSearchResult {
+    title: String,
+    url: String,
+    domain: String,
+    shop: Option<String>,
+    snippet: String,
+    prices: Vec<i64>,
+}
+
 /// Bot commands
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Supported commands:")]
@@ -76,6 +95,8 @@ enum Command {
     Arbitrage(String),
     #[command(description = "Compare stores: /compare <product_id>")]
     Compare(String),
+    #[command(description = "Web search: /web <query>")]
+    Web(String),
 }
 
 #[tokio::main]
@@ -162,13 +183,45 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
         Ok(products) => {
             match products.len() {
                 0 => {
-                    bot.send_message(chat_id, "😕 Товар не найден. Попробуйте другой запрос.")
+                    // Product not found in DB - try web search
+                    bot.send_message(chat_id, "😕 Товар не найден в БД. Ищу в интернете...")
                         .await?;
+
+                    match call_web_search(text, 15).await {
+                        Ok(results) => {
+                            let response = format_web_search_results(&results);
+                            bot.send_message(chat_id, response)
+                                .parse_mode(ParseMode::Html)
+                                .await?;
+                        }
+                        Err(e) => {
+                            error!("Web search fallback failed: {:#}", e);
+                            bot.send_message(chat_id, "😕 Ничего не найдено.")
+                                .await?;
+                        }
+                    }
                 }
                 1 => {
-                    // Found exactly one product - show full info
+                    // Found exactly one product - show full info from DB
                     let product = &products[0];
                     show_full_product_info(&bot, chat_id, product, &db).await?;
+
+                    // Also run web search to find better prices
+                    bot.send_message(chat_id, "🌐 Ищу лучшие цены в интернете...")
+                        .await?;
+
+                    match call_web_search(text, 15).await {
+                        Ok(results) => {
+                            let response = format_web_search_results(&results);
+                            bot.send_message(chat_id, response)
+                                .parse_mode(ParseMode::Html)
+                                .await?;
+                        }
+                        Err(e) => {
+                            error!("Web search failed: {:#}", e);
+                            // Silent fail - DB results already shown
+                        }
+                    }
                 }
                 _ => {
                     // Multiple products - show list
@@ -268,6 +321,33 @@ async fn call_ml_predictor(product_id: i64) -> Result<PricePredictionResponse> {
         .context("Failed to parse ML predictor output")?;
 
     Ok(prediction)
+}
+
+/// Call web search Python script
+async fn call_web_search(query: &str, max_results: i32) -> Result<WebSearchResponse> {
+    use tokio::process::Command;
+
+    // Use venv Python for duckduckgo-search dependency
+    let output = Command::new("venv/bin/python")
+        .arg("scripts/web_search.py")
+        .arg("search")
+        .arg("--query")
+        .arg(query)
+        .arg("--max-results")
+        .arg(max_results.to_string())
+        .output()
+        .await
+        .context("Failed to execute web_search.py")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("Web search failed: {}", stderr);
+    }
+
+    let response: WebSearchResponse = serde_json::from_slice(&output.stdout)
+        .context("Failed to parse web search output")?;
+
+    Ok(response)
 }
 
 /// Handle bot commands
@@ -501,6 +581,31 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                 }
             }
         }
+
+        Command::Web(query) => {
+            if query.trim().is_empty() {
+                bot.send_message(chat_id, "❌ Укажите запрос.\n\nПример: /web рогатка centershot")
+                    .await?;
+                return Ok(());
+            }
+
+            bot.send_message(chat_id, format!("🌐 Ищу в интернете: {}...", query))
+                .await?;
+
+            match call_web_search(&query, 15).await {
+                Ok(results) => {
+                    let response = format_web_search_results(&results);
+                    bot.send_message(chat_id, response)
+                        .parse_mode(ParseMode::Html)
+                        .await?;
+                }
+                Err(e) => {
+                    error!("Web search failed: {:#}", e);
+                    bot.send_message(chat_id, "❌ Ошибка веб-поиска. Попробуйте позже.")
+                        .await?;
+                }
+            }
+        }
     }
 
     Ok(())
@@ -535,6 +640,7 @@ fn format_help_message() -> String {
 <b>Basic:</b>
 /search &lt;query&gt; - Search for products
 /price &lt;id&gt; - Get current prices
+/web &lt;query&gt; - Web search (DuckDuckGo)
 
 <b>Analytics:</b>
 /trends &lt;id&gt; [days] - Price trends (default: 7 days)
@@ -542,18 +648,18 @@ fn format_help_message() -> String {
 /compare &lt;id&gt; - Compare stores by price/availability
 /arbitrage [profit%] - Find price differences (default: 10%)
 
+<b>Smart Search:</b>
+Just type product name - bot will search DB and web!
+
 <b>Examples:</b>
 /search MacBook Pro 16
 /price 1
+/web рогатка centershot
 /trends 1 30
 /predict 1
-/compare 1
-/arbitrage 15
 
 <b>Coming Soon:</b>
 /track &lt;id&gt; &lt;price&gt; - Set price alert
-/untrack &lt;id&gt; - Remove price alert
-/mytracking - View your tracked products
 "#.to_string()
 }
 
@@ -794,4 +900,53 @@ fn format_store_comparison(product_id: i64, stores: &[(String, f64, i64, f64)]) 
     response.push_str("\n💡 <i>Higher availability = more reliable</i>");
 
     response
+}
+
+fn format_web_search_results(response: &WebSearchResponse) -> String {
+    let mut msg = format!("<b>🌐 Веб-поиск: {}</b>\n\n", response.query);
+
+    if let Some(err) = &response.error {
+        msg.push_str(&format!("❌ Ошибка: {}\n", err));
+        return msg;
+    }
+
+    // Filter results with prices
+    let with_prices: Vec<_> = response.results.iter()
+        .filter(|r| !r.prices.is_empty())
+        .collect();
+
+    if with_prices.is_empty() {
+        msg.push_str("😕 Цены не найдены в результатах поиска.\n\n");
+
+        // Show first few results without prices
+        let other_results: Vec<_> = response.results.iter().take(3).collect();
+        if !other_results.is_empty() {
+            msg.push_str("<b>Найденные ссылки:</b>\n");
+            for (i, result) in other_results.iter().enumerate() {
+                let shop = result.shop.as_deref().unwrap_or(&result.domain);
+                msg.push_str(&format!("{}. {}\n", i + 1, shop));
+            }
+        }
+    } else {
+        msg.push_str(&format!("<b>Найдено {} результатов с ценами:</b>\n\n", with_prices.len()));
+
+        for (i, result) in with_prices.iter().take(5).enumerate() {
+            let shop = result.shop.as_deref().unwrap_or(&result.domain);
+            let min_price = result.prices.iter().min().unwrap_or(&0);
+
+            msg.push_str(&format!(
+                "{}. <b>{}</b>\n   💰 от {} ₽\n   🔗 {}\n\n",
+                i + 1,
+                shop,
+                min_price,
+                result.domain
+            ));
+        }
+
+        if with_prices.len() > 5 {
+            msg.push_str(&format!("<i>... и ещё {} результатов</i>\n", with_prices.len() - 5));
+        }
+    }
+
+    msg
 }
