@@ -23,6 +23,16 @@ except ImportError:
     sys.exit(1)
 
 
+# Aggregators and price comparison sites (not real shops - exclude from results)
+AGGREGATORS = {
+    "steel-gun.ru",
+    "price.ru",
+    "e-katalog.ru",
+    "sravni.com",
+    "goods-price.ru",
+    "nadavi.ru",
+}
+
 # Known shops with their display names
 KNOWN_SHOPS = {
     # Major marketplaces
@@ -111,6 +121,11 @@ def search_prices(query: str, max_results: int = 20) -> dict:
 
             # Parse domain
             domain = urlparse(url).netloc.replace("www.", "")
+
+            # Skip aggregators and price comparison sites
+            is_aggregator = any(agg in domain for agg in AGGREGATORS)
+            if is_aggregator:
+                continue
 
             # Extract prices from title and snippet
             combined_text = f"{title} {snippet}"
