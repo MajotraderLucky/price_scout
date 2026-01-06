@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-06 (PS-30 Bot Notifications + Project Cleanup)
+> Последнее обновление: 2026-01-06 (PS-40 Bot Localization to Russian)
 
 ---
 
@@ -31,6 +31,7 @@
 
 | ID    | Задача                                 | Дата       | Результат                         |
 |-------|----------------------------------------|------------|-----------------------------------|
+| PS-40 | Bot Localization (Russian)             | 2026-01-06 | All UI strings translated to RU   |
 | PS-30 | Bot Notifications + Command Hints      | 2026-01-06 | Auto-notifications, footer hints  |
 | PS-39 | Market Research System                 | 2026-01-06 | Top 100, discovery, /top command  |
 | PS-8  | Telegram Bot (teloxide)                | 2026-01-06 | 10 commands, standalone DB mode   |
@@ -112,7 +113,7 @@
 | Задач в Backlog   | 4                |
 | Задач In Progress | 0                |
 | Задач в Review    | 2                |
-| Задач Done        | 26               |
+| Задач Done        | 27               |
 | Python скриптов   | 25               |
 | Rust modules      | 10               |
 | Bot commands      | 10               |
@@ -220,6 +221,7 @@
 
 | Дата       | Изменение                                                         |
 |------------|-------------------------------------------------------------------|
+| 2026-01-06 | PS-40: Bot Localization - all UI strings translated to Russian    |
 | 2026-01-06 | PS-30: Bot Notifications - auto-analytics, command footer hints   |
 | 2026-01-06 | Project cleanup: reports moved to docs/reports/, debug files del  |
 | 2026-01-06 | PS-39: Market Research - Top 100, discovery, /top, /web commands  |
@@ -264,6 +266,39 @@
 ---
 
 ## Описание задач
+
+### PS-40: Bot Localization (Russian)
+
+**Статус:** Complete (2026-01-06)
+
+**Цель:** Локализовать интерфейс Telegram бота на русский язык для российских пользователей.
+
+**Реализовано:**
+
+| Категория            | Количество | Примеры                                   |
+|----------------------|------------|-------------------------------------------|
+| Command descriptions | 10         | "Поиск товаров", "Цены товара"            |
+| Welcome/Help         | 2          | "Добро пожаловать в Price Scout!"         |
+| Error messages       | 15         | "Товар не найден", "Укажите ID товара"    |
+| Status messages      | 10         | "Ищу:", "Получаю цены для товара"         |
+| Format headers       | 8          | "Найдено товаров:", "Тренды цен"          |
+| Hints                | 6          | "Ниже средняя = лучше цена"               |
+
+**Примеры переводов:**
+
+| English                           | Russian                              |
+|-----------------------------------|--------------------------------------|
+| Welcome to Price Scout Bot!       | Добро пожаловать в Price Scout!      |
+| Searching for:                    | Ищу:                                 |
+| Product not found                 | Товар не найден                      |
+| Arbitrage Opportunities           | Арбитражные возможности              |
+| Lower average = better price      | Ниже средняя = лучше цена            |
+| Use /price <id> to see prices     | /price <id> - посмотреть цены        |
+
+**Файлы:**
+- crates/bot/src/main.rs (~100 строк изменений)
+
+---
 
 ### PS-30: Bot Notifications + Command Hints
 
