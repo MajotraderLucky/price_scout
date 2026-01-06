@@ -69,7 +69,7 @@ pub struct Product {
     pub id: i64,
     pub name: String,
     pub category: Option<String>,
-    pub specs: serde_json::Value,
+    pub specs: Option<serde_json::Value>,
     pub search_query: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

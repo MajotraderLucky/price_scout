@@ -338,6 +338,70 @@ curl http://localhost:3000/api/queue/stats
 
 ---
 
+## Analytics Endpoints
+
+Price Scout provides advanced analytics endpoints for market analysis, price trends, currency correlations, and store comparisons.
+
+**Full Documentation**: See [ANALYTICS_API.md](ANALYTICS_API.md) for detailed specifications.
+
+### Quick Overview
+
+**Price Trends**:
+```bash
+GET /api/analytics/price-trends/:id?days=7
+```
+
+**Currency Correlation**:
+```bash
+GET /api/analytics/currency-correlation/:id?currency=USD&days=30
+```
+
+**Store Comparison**:
+```bash
+GET /api/analytics/store-comparison/:id?days=30
+```
+
+**Market Overview**:
+```bash
+GET /api/analytics/market-overview?min_price=5000&max_price=15000&days=7
+```
+
+**Arbitrage Opportunities**:
+```bash
+GET /api/arbitrage?min_profit=10
+```
+
+**ML Price Predictions**:
+```bash
+GET /api/analytics/predictions/:id
+```
+
+**Example**:
+```bash
+# Get price trends for product 1 over last 30 days
+curl "http://localhost:3000/api/analytics/price-trends/1?days=30" | jq
+```
+
+**Response Example**:
+```json
+{
+  "product_id": 1,
+  "trends": [
+    {
+      "date": "2025-01-05",
+      "avg_price": 125000.50,
+      "min_price": 120000,
+      "max_price": 130000,
+      "volatility": 2547.32
+    }
+  ]
+}
+```
+
+For detailed documentation including all parameters, response schemas, and use cases, see [ANALYTICS_API.md](ANALYTICS_API.md).
+
+---
+
 ## Error Handling
 
 All errors return a JSON response with the following format:
@@ -400,6 +464,12 @@ cargo run --bin price-scout-api
    POST /api/search
    POST /api/products/:id/scrape
    GET  /api/queue/stats
+   GET  /api/analytics/price-trends/:id
+   GET  /api/analytics/currency-correlation/:id
+   GET  /api/analytics/store-comparison/:id
+   GET  /api/analytics/market-overview
+   GET  /api/arbitrage
+   GET  /api/analytics/predictions/:id
 ```
 
 ---
@@ -515,6 +585,6 @@ sudo systemctl status price-scout-api
 
 ---
 
-**Last Updated**: 2026-01-05
-**API Version**: 0.1.0
-**Status**: Production Ready (Phase 1)
+**Last Updated**: 2025-01-05
+**API Version**: 0.2.0
+**Status**: Production Ready (Phase 1 + Analytics)

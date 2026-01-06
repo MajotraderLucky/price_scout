@@ -47,7 +47,7 @@ impl Default for WorkerConfig {
     fn default() -> Self {
         Self {
             batch_size: 10,
-            poll_interval: Duration::from_secs(5),
+            poll_interval: Duration::from_secs(600), // 10 minutes for scheduled scraping
             max_retries: 3,
             initial_retry_delay: Duration::from_secs(60),
             max_retry_delay: Duration::from_secs(3600),

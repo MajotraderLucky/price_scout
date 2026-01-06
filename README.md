@@ -2,7 +2,7 @@
 
 **Разведчик цен** - система мониторинга и сравнения цен на товары с различных интернет-магазинов.
 
-## Текущий статус: 8/8 магазинов работают
+## Текущий статус: 9/9 магазинов работают
 
 | Магазин       | Цена        | Метод                 | Время  | Статус   |
 |---------------|-------------|-----------------------|--------|----------|
@@ -14,6 +14,7 @@
 | regard.ru     | 144,400 RUB | Playwright Stealth    | 7.9s   | [+] PASS |
 | kns.ru        | 156,463 RUB | Playwright Direct     | 3.5s   | [+] PASS |
 | Yandex Market | 295,309 RUB | Playwright + Stealth  | 15.4s  | [+] PASS |
+| AliExpress.ru | 1,489 RUB   | Playwright + Stealth  | 19.4s  | [+] PASS |
 
 ## Архитектура
 
@@ -47,10 +48,10 @@
 
 ## Возможности
 
-- Парсинг 8 интернет-магазинов
-- Обход защиты: Qrator WAF, Rate Limiting, Bot Detection
+- Парсинг 9 интернет-магазинов (включая AliExpress.ru)
+- Обход защиты: Qrator WAF, Rate Limiting, Bot Detection, AJAX-загрузка
 - 3 метода парсинга: Playwright Direct, Stealth, Firefox+xdotool
-- Retry логика для нестабильных источников (Citilink)
+- Fallback DOM парсинг для AliExpress (когда window.runParams недоступен)
 - Unified test system для всех магазинов
 
 ## Технологический стек

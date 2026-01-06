@@ -39,8 +39,10 @@
 
 pub mod python_bridge;
 pub mod queue;
+pub mod scheduler;
 pub mod worker;
 
 pub use python_bridge::*;
 pub use queue::{JobStats, ScraperQueue};
+pub use scheduler::{Scheduler, SchedulerConfig};
 pub use worker::{ScraperWorker, WorkerConfig};

@@ -28,13 +28,14 @@ INSERT INTO stores (name, base_url, method, parser, unstable) VALUES
 
 -- Insert unstable stores (unstable=true)
 INSERT INTO stores (name, base_url, method, parser, unstable) VALUES
-('citilink', 'https://www.citilink.ru', 'citilink_firefox', 'citilink_json', true);
+('citilink', 'https://www.citilink.ru', 'citilink_firefox', 'citilink_json', true),
+('aliexpress', 'https://aliexpress.ru', 'playwright_stealth', 'aliexpress_runparams', true);
 
 -- ============================================================================
 -- STORE DETAILS
 -- ============================================================================
 
-COMMENT ON TABLE stores IS 'Updated: 2026-01-04 - 9 stores total (8 stable + 1 unstable)';
+COMMENT ON TABLE stores IS 'Updated: 2026-01-05 - 10 stores total (8 stable + 2 unstable)';
 
 -- Verification query
 DO $$
@@ -66,6 +67,7 @@ BEGIN
     RAISE NOTICE '';
     RAISE NOTICE 'Unstable stores:';
     RAISE NOTICE '  9. citilink (Rate limiting, manual testing only)';
+    RAISE NOTICE ' 10. aliexpress (Aggressive protection, manual testing initially)';
     RAISE NOTICE '========================================';
 END $$;
 

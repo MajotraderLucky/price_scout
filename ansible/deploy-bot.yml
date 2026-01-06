@@ -1,0 +1,44 @@
+---
+- name: Deploy Price Scout Telegram Bot
+  hosts: archbook
+  become: yes
+  vars:
+    bot_user: sergey
+    bot_path: /home/sergey/price_scout
+
+  tasks:
+    - name: Copy systemd service file
+      copy:
+        src: "{{ bot_path }}/config/price-scout-bot.service"
+        dest: /etc/systemd/system/price-scout-bot.service
+        owner: root
+        group: root
+        mode: '0644'
+        remote_src: yes
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable bot service
+      systemd:
+        name: price-scout-bot
+        enabled: yes
+
+    - name: Start bot service
+      systemd:
+        name: price-scout-bot
+        state: started
+
+    - name: Wait for bot to start
+      wait_for:
+        timeout: 5
+
+    - name: Check bot service status
+      systemd:
+        name: price-scout-bot
+      register: bot_status
+
+    - name: Display bot status
+      debug:
+        msg: "Bot service is {{ bot_status.status.ActiveState }}"

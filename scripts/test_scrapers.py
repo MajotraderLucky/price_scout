@@ -34,7 +34,7 @@ from specs_filter import TargetSpecs, filter_and_rank
 
 # === Конфигурация тестов ===
 
-TEST_ARTICLE = ""  # No specific article - search by specs
+TEST_ARTICLE = "macbook pro 16"  # Test query for AliExpress
 TEST_PRODUCT = "MacBook Pro 16\" M1 (or newer) 16GB+"
 
 # Target specifications for filtering (minimum requirements)
@@ -145,6 +145,15 @@ STORES: List[StoreConfig] = [
         method="avito_firefox",
         search_url="https://www.avito.ru/rossiya/noutbuki?q=MacBook+Pro+16",
         parser="avito_json",
+    ),
+    StoreConfig(
+        name="aliexpress",
+        method="playwright_stealth",
+        search_url="https://aliexpress.ru/wholesale?SearchText={query}",
+        parser="aliexpress_runparams",  # window.runParams extraction
+        delay=5,  # 5 seconds to avoid aggressive rate limiting
+        validate_price=True,
+        unstable=True,  # Aggressive protection - test manually initially
     ),
 ]
 
@@ -466,6 +475,149 @@ def parse_avito_json(json_path: str, filter_specs: bool = True) -> Optional[Dict
     return None
 
 
+def parse_aliexpress_runparams(html: str) -> Optional[Dict]:
+    """
+    Extract product data from AliExpress window.runParams JavaScript variable.
+    Falls back to DOM parsing if window.runParams not found (for aliexpress.ru).
+
+    AliExpress embeds all product data in window.runParams object in page HTML.
+    This function extracts and parses this data instead of scraping DOM elements.
+
+    Args:
+        html: Page HTML content
+
+    Returns:
+        Dict with price, available, name, count keys or None if extraction failed
+    """
+    import re
+    import json
+
+    try:
+        # Try Method 1: window.runParams (works on aliexpress.com)
+        pattern = r'window\.runParams\s*=\s*(\{.*?\});'
+        match = re.search(pattern, html, re.DOTALL)
+
+        if match:
+            print("✓ Found window.runParams, parsing...")
+            # Parse JSON data
+            data = json.loads(match.group(1))
+
+            # Navigate through nested structure to find product list
+            # Structure: data -> root -> fields -> mods -> itemList -> content
+            products_data = data.get('data', {}).get('root', {}).get('fields', {}).get('mods', {}).get('itemList', {}).get('content', [])
+
+            if not products_data:
+                print("No products found in window.runParams")
+                return None
+
+            # Extract product information
+            results = []
+            for item in products_data:
+                title = item.get('title', {}).get('displayTitle', '')
+                price_data = item.get('prices', {}).get('salePrice', {})
+                price_str = price_data.get('minPrice', '')
+
+                if price_str and 'RUB' in price_str:
+                    # Extract numeric price from "1,234.56 RUB" or "1234 RUB"
+                    price_cleaned = price_str.replace(',', '').replace('RUB', '').replace('\u20BD', '').strip()
+                    try:
+                        price_num = int(float(price_cleaned) * 100)  # Convert to kopecks
+                        results.append({
+                            'name': title,
+                            'price': price_num,
+                            'available': True
+                        })
+                    except ValueError:
+                        continue
+
+            if results:
+                # Return first product (best match)
+                best_product = results[0]
+                return {
+                    "price": best_product['price'],
+                    "available": best_product['available'],
+                    "name": best_product['name'],
+                    "count": len(results),
+                    "match_score": 0,  # No specs filtering yet
+                    "matched_products": len(results),
+                    "total_products": len(results),
+                }
+
+        # Method 2: Fallback DOM parsing (for aliexpress.ru)
+        print("window.runParams not found, using fallback DOM parser...")
+
+        # Find all product cards with data-product-id
+        product_pattern = r'data-product-id="([^"]*)"'
+        product_ids = re.findall(product_pattern, html)
+        print(f"Found {len(product_ids)} products with data-product-id")
+
+        # Extract prices (format: "4&nbsp;500&nbsp;₽" or "2 351 ₽")
+        # Look for prices that are likely product prices (not promotional "-300₽")
+        price_pattern = r'<span[^>]*>(\d+(?:&nbsp;|\s)\d+(?:&nbsp;|\s)*₽)</span>'
+        prices_raw = re.findall(price_pattern, html)
+
+        # Clean prices and convert to kopecks
+        prices = []
+        for price_str in prices_raw:
+            # Remove HTML entities and spaces
+            clean = price_str.replace('&nbsp;', '').replace(' ', '').replace('₽', '').strip()
+            try:
+                price_num = int(clean) * 100  # Convert to kopecks
+                if price_num > 10000:  # Filter out suspiciously low prices (< 100 RUB)
+                    prices.append(price_num)
+            except ValueError:
+                continue
+
+        # Extract product titles from divs with "title" in class
+        title_pattern = r'<div[^>]*class="[^"]*title[^"]*"[^>]*>(.*?)</div>'
+        titles_raw = re.findall(title_pattern, html, re.IGNORECASE | re.DOTALL)
+
+        # Clean titles (remove nested HTML tags)
+        titles = []
+        for title_html in titles_raw:
+            # Strip HTML tags
+            clean = re.sub(r'<[^>]+>', '', title_html).strip()
+            if clean and len(clean) > 10 and len(clean) < 200:  # Reasonable title length
+                titles.append(clean)
+
+        print(f"Extracted {len(prices)} prices, {len(titles)} titles")
+
+        if not prices:
+            print("No valid prices found in DOM")
+            return None
+
+        # Match prices with titles (assume same order or use first available)
+        results = []
+        for i, price in enumerate(prices):
+            title = titles[i] if i < len(titles) else "AliExpress Product"
+            results.append({
+                'name': title,
+                'price': price,
+                'available': True
+            })
+
+        if not results:
+            return None
+
+        # Return best (cheapest) product
+        results.sort(key=lambda x: x['price'])
+        best_product = results[0]
+
+        return {
+            "price": best_product['price'],
+            "available": best_product['available'],
+            "name": best_product['name'],
+            "count": len(results),
+            "match_score": 0,  # No specs filtering yet
+            "matched_products": len(results),
+            "total_products": len(results),
+        }
+
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        print(f"Error parsing AliExpress data: {type(e).__name__}: {e}")
+        return None
+
+
 def parse_citilink_json(json_path: str, filter_specs: bool = True) -> Optional[Dict]:
     """
     Парсинг Citilink JSON с фильтрацией по характеристикам
@@ -705,9 +857,19 @@ def test_playwright_stealth(store: StoreConfig, query: str) -> TestResult:
                 result.error = f"HTTP {response.status}"
                 return result
 
-            random_delay(2, 4)
-            human_scroll(page)
-            random_delay(1, 2)
+            # AliExpress: Extended wait for JavaScript to load products
+            if store.name == "aliexpress":
+                print("Extended wait for AliExpress AJAX loading...")
+                time.sleep(3)  # Initial wait
+                human_scroll(page)
+                time.sleep(5)  # Wait for products to load after scroll
+                # Scroll again to trigger lazy loading
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                time.sleep(3)  # Final wait
+            else:
+                random_delay(2, 4)
+                human_scroll(page)
+                random_delay(1, 2)
 
             html = page.content()
 
@@ -730,6 +892,14 @@ def test_playwright_stealth(store: StoreConfig, query: str) -> TestResult:
                     result.price = parsed["price"]
                     result.available = parsed["available"]
                     result.details["count"] = parsed.get("count", 0)
+            elif store.parser == "aliexpress_runparams":
+                parsed = parse_aliexpress_runparams(html)
+                if parsed:
+                    result.price = parsed["price"]
+                    result.available = parsed["available"]
+                    result.details["count"] = parsed.get("count", 0)
+                    result.details["matched_products"] = parsed.get("matched_products", 0)
+                    result.details["total_products"] = parsed.get("total_products", 0)
             else:
                 result.price = extract_price(html)
                 result.available = extract_availability(html)

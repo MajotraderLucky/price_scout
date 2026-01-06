@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-05
+> Последнее обновление: 2026-01-06 (PS-8 Telegram Bot Complete)
 
 ---
 
@@ -8,13 +8,12 @@
 
 ### Backlog
 
-| ID    | Задача                                   | Приоритет | План                   |
-|-------|------------------------------------------|-----------|------------------------|
-| PS-10 | Тест 2Captcha на реальном сайте          | High      | [LEARNING_PATH.md]     |
-| PS-11 | Тест парсинга с домашнего ПК             | High      | [API_ENDPOINTS.md]     |
-| PS-6  | Настроить PostgreSQL схему               | Medium    | [TECH_STACK.md]        |
-| PS-7  | Настроить Redis кэширование              | Medium    | [TECH_STACK.md]        |
-| PS-8  | Реализовать Telegram бот (teloxide)      | Medium    | [ROADMAP.md]           |
+| ID    | Задача                          | Приоритет | План               |
+|-------|---------------------------------|-----------|--------------------|
+| PS-10 | Тест 2Captcha на реальном сайте | High      | [LEARNING_PATH.md] |
+| PS-11 | Тест парсинга с домашнего ПК    | High      | [API_ENDPOINTS.md] |
+| PS-6  | Настроить PostgreSQL схему      | Medium    | [TECH_STACK.md]    |
+| PS-7  | Настроить Redis кэширование     | Medium    | [TECH_STACK.md]    |
 
 ### In Progress
 
@@ -30,40 +29,48 @@
 
 ### Done
 
-| ID    | Задача                                   | Дата       | Результат                        |
-|-------|------------------------------------------|------------|----------------------------------|
-| PS-28 | API Server (Axum REST endpoints)         | 2026-01-05 | 7 endpoints, integration ready   |
-| PS-29 | Scraper Orchestration (Queue + Worker)   | 2026-01-04 | Job queue + background worker    |
-| PS-23 | Python Bridge Implementation             | 2026-01-04 | Rust-Python subprocess bridge    |
-| PS-22 | Rust Workspace Bootstrap                 | 2026-01-04 | 5 crates, 335 dependencies       |
-| PS-21 | PostgreSQL Schema Implementation         | 2026-01-04 | 7 tables, migrations applied     |
-| PS-20 | Управление Citilink Rate Limiting        | 2026-01-04 | Исключен из регулярных тестов    |
-| PS-19 | Фильтрация товаров по характеристикам    | 2026-01-03 | Phase 1: DNS specs filter (80%)  |
-| PS-18 | Исправить Citilink rate limiting         | 2026-01-03 | Задержки 90-210s, стабильно      |
-| PS-17 | Исправить парсер Avito                   | 2026-01-03 | Работает! 9/9 магазинов          |
-| PS-16 | Advanced bypass (Firefox/Warmup)         | 2025-12-31 | Серверная защита, не обходится   |
-| PS-15 | Stealth-тест на заблокированных          | 2025-12-31 | Citilink/DNS/Kotofoto - CAPTCHA  |
-| PS-14 | Stealth scraper (playwright-stealth)     | 2025-12-31 | stealth_scraper.py, regard.ru OK |
-| PS-12 | Исследование доступных магазинов         | 2025-12-31 | 7 магазинов верифицировано       |
-| PS-13 | Верификация товара (5-point check)       | 2025-12-31 | find_macbook_price.py            |
-| PS-9  | Интеграция 2Captcha                      | 2025-12-31 | test_captcha_solver.py           |
-| PS-5  | Python прототип парсера                  | 2025-12-31 | test_search.py, Playwright tests |
-| PS-4  | Playwright тесты DNS/Citilink            | 2025-12-31 | Blocked by CAPTCHA/401           |
-| PS-3  | Путь обучения web scraping               | 2025-12-31 | [LEARNING_PATH.md]               |
-| PS-0  | Документация и планирование              | 2025-12-31 | [README.md]                      |
+| ID    | Задача                                 | Дата       | Результат                         |
+|-------|----------------------------------------|------------|-----------------------------------|
+| PS-8  | Telegram Bot (teloxide)                | 2026-01-06 | 8 commands, standalone DB mode    |
+| PS-38 | ML Price Predictions (Random Forest)   | 2026-01-05 | 7-day forecasts, Python ML script |
+| PS-37 | Arbitrage Detector                     | 2026-01-05 | Price differences across stores   |
+| PS-36 | Analytics Dashboard                    | 2026-01-05 | 6 endpoints (trends, correlation) |
+| PS-35 | Automated Scheduled Scraping           | 2026-01-05 | Scheduler + 2 binaries, 10-min    |
+| PS-34 | Currency Rates Tracking                | 2026-01-05 | Dual sources (CBR + open.er-api)  |
+| PS-33 | Add AliExpress Russia marketplace      | 2026-01-05 | Fallback DOM parser, 9th store    |
+| PS-28 | API Server (Axum REST endpoints)       | 2026-01-05 | 13 endpoints, analytics ready     |
+| PS-29 | Scraper Orchestration (Queue + Worker) | 2026-01-04 | Job queue + background worker     |
+| PS-23 | Python Bridge Implementation           | 2026-01-04 | Rust-Python subprocess bridge     |
+| PS-22 | Rust Workspace Bootstrap               | 2026-01-04 | 5 crates, 335 dependencies        |
+| PS-21 | PostgreSQL Schema Implementation       | 2026-01-04 | 7 tables, migrations applied      |
+| PS-20 | Управление Citilink Rate Limiting      | 2026-01-04 | Исключен из регулярных тестов     |
+| PS-19 | Фильтрация товаров по характеристикам  | 2026-01-03 | Phase 1: DNS specs filter (80%)   |
+| PS-18 | Исправить Citilink rate limiting       | 2026-01-03 | Задержки 90-210s, стабильно       |
+| PS-17 | Исправить парсер Avito                 | 2026-01-03 | Работает! 9/9 магазинов           |
+| PS-16 | Advanced bypass (Firefox/Warmup)       | 2025-12-31 | Серверная защита, не обходится    |
+| PS-15 | Stealth-тест на заблокированных        | 2025-12-31 | Citilink/DNS/Kotofoto - CAPTCHA   |
+| PS-14 | Stealth scraper (playwright-stealth)   | 2025-12-31 | stealth_scraper.py, regard.ru OK  |
+| PS-12 | Исследование доступных магазинов       | 2025-12-31 | 7 магазинов верифицировано        |
+| PS-13 | Верификация товара (5-point check)     | 2025-12-31 | find_macbook_price.py             |
+| PS-9  | Интеграция 2Captcha                    | 2025-12-31 | test_captcha_solver.py            |
+| PS-5  | Python прототип парсера                | 2025-12-31 | test_search.py, Playwright tests  |
+| PS-4  | Playwright тесты DNS/Citilink          | 2025-12-31 | Blocked by CAPTCHA/401            |
+| PS-3  | Путь обучения web scraping             | 2025-12-31 | [LEARNING_PATH.md]                |
+| PS-0  | Документация и планирование            | 2025-12-31 | [README.md]                       |
 
 ---
 
 ## Quick Links
 
-| Документ           | Описание                       | Путь                           |
-|--------------------|--------------------------------|--------------------------------|
-| README             | Обзор проекта                  | [README.md](README.md)         |
-| Learning Path      | Путь обучения парсингу         | [docs/LEARNING_PATH.md]        |
-| API Endpoints      | Результаты диагностики         | [docs/API_ENDPOINTS.md]        |
-| Roadmap            | Фазы разработки                | [docs/ROADMAP.md]              |
-| Tech Stack         | Архитектура и технологии       | [docs/TECH_STACK.md]           |
-| Parsing Strategy   | Стратегия парсинга             | [docs/PARSING_STRATEGY.md]     |
+| Документ           | Описание                                    | Путь                                                                   |
+|--------------------|---------------------------------------------|------------------------------------------------------------------------|
+| README             | Обзор проекта                               | [README.md](README.md)                                                 |
+| Market Analysis    | План развития: Анализ рынка и торговля      | [~/.claude/plans/cheerful-bubbling-catmull.md]                         |
+| Learning Path      | Путь обучения парсингу                      | [docs/LEARNING_PATH.md]                                                |
+| API Endpoints      | Результаты диагностики                      | [docs/API_ENDPOINTS.md]                                                |
+| Roadmap            | Фазы разработки                             | [docs/ROADMAP.md]                                                      |
+| Tech Stack         | Архитектура и технологии                    | [docs/TECH_STACK.md]                                                   |
+| Parsing Strategy   | Стратегия парсинга                          | [docs/PARSING_STRATEGY.md]                                             |
 
 ---
 
@@ -96,23 +103,30 @@
 
 ## Project Stats
 
-| Метрика              | Значение           |
-|----------------------|--------------------|
-| Фаза                 | MVP (Phase 1)      |
-| Статус               | Development        |
-| Задач в Backlog      | 5                  |
-| Задач In Progress    | 0                  |
-| Задач в Review       | 2                  |
-| Задач Done           | 17                 |
-| Python скриптов      | 22                 |
-| Rust modules         | 9                  |
-| Документов           | 16                 |
+| Метрика           | Значение         |
+|-------------------|------------------|
+| Фаза              | Phase 3 Complete |
+| Статус            | Analytics Ready  |
+| Задач в Backlog   | 4                |
+| Задач In Progress | 0                |
+| Задач в Review    | 2                |
+| Задач Done        | 24               |
+| Python скриптов   | 24               |
+| Rust modules      | 9                |
+| Документов        | 19               |
 
 ---
 
 ## Current Focus
 
-**Статус: ALL TESTS PASSED - 9/9 магазинов работают!**
+**Статус: ANALYTICS PLATFORM COMPLETE - Phase 3 Done!**
+
+**Новые возможности:**
+- [+] Analytics API (6 endpoints): Price trends, currency correlation, store comparison, market overview
+- [+] Arbitrage detector: Find price differences across stores (10%+ profit opportunities)
+- [+] ML Price predictions: 7-day forecasts using Random Forest (Python + scikit-learn)
+- [+] Automated scraping: Every 10 minutes for products in 5,000-15,000 RUB range
+- [+] Currency tracking: Dual sources (ЦБ РФ + open.er-api.com)
 
 **Инфраструктура:**
 | Сервер   | IP              | Провайдер  | Статус       |
@@ -193,38 +207,45 @@
 
 ## Changelog
 
-| Дата       | Изменение                                                   |
-|------------|-------------------------------------------------------------|
-| 2026-01-05 | PS-28: API Server - Axum REST API (7 endpoints, 405 lines)  |
-| 2026-01-04 | PS-29: Scraper Orchestration - Queue + Worker (1,770 lines) |
-| 2026-01-04 | PS-23: Python Bridge - Rust-Python subprocess communication |
-| 2026-01-04 | PS-22: Rust workspace initialized - 5 crates compiled       |
-| 2026-01-04 | PS-21: PostgreSQL schema created - 7 tables, 9 stores       |
-| 2026-01-03 | Citilink rate limiting исправлен! Задержки 90-210s, 24.4s   |
-| 2026-01-03 | Avito работает! Исправлен парсер, 9/9 магазинов, 51,799 RUB |
-| 2026-01-02 | Ozon добавлен! 75,024 RUB через Firefox, 8/9 магазинов      |
-| 2026-01-02 | Yandex Market добавлен! 287,891 RUB, 7/8 магазинов работают |
-| 2026-01-02 | ALL TESTS PASSED! 6/6 unified test, все методы работают     |
-| 2026-01-02 | test_scrapers.py: citilink_special + firefox xvfb fix       |
-| 2026-01-02 | Citilink работает! Playwright + delay, 10 моделей           |
-| 2026-01-02 | Добавлен nix.ru (129,563 RUB), 7/7 магазинов работают       |
-| 2026-01-02 | DNS-Shop работает! Firefox + xdotool, 77 моделей            |
-| 2025-12-31 | PS-19: DNS-Shop - IP banned + Qrator, нет доступа           |
-| 2025-12-31 | PS-18: Citilink работает! 6 цен MacBook получено            |
-| 2025-12-31 | PS-17: Деплой на Archbook - i-ray.ru работает!              |
-| 2025-12-31 | PS-16: Advanced bypass - серверная защита, не обойти        |
-| 2025-12-31 | PS-15: Stealth не обходит Citilink/DNS/Kotofoto             |
-| 2025-12-31 | Stealth scraper: обход защиты regard.ru (144,400)           |
-| 2025-12-31 | Найден i-ray.ru: 107,999 RUB, В наличии, verified           |
-| 2025-12-31 | find_macbook_price.py: верификация товара (5 checks)        |
-| 2025-12-31 | Скрипты поиска MacBook по артикулу Z14V0008D                |
-| 2025-12-31 | Добавлена интеграция 2Captcha (PS-9)                        |
-| 2025-12-31 | Тесты Playwright: DNS (401), Citilink (CAPTCHA)             |
-| 2025-12-31 | Создан test_search.py - DuckDuckGo работает                 |
-| 2025-12-31 | Создан LEARNING_PATH.md - путь обучения                     |
-| 2025-12-31 | PS-1 заблокирован: e-katalog.ru недоступен                  |
-| 2025-12-31 | Создан дашборд проекта                                      |
-| 2025-12-31 | Начальная документация проекта                              |
+| Дата       | Изменение                                                         |
+|------------|-------------------------------------------------------------------|
+| 2026-01-06 | PS-8: Telegram Bot - teloxide, 8 commands, standalone mode        |
+| 2026-01-05 | PS-38: ML Price Predictions - Random Forest 7-day forecasts       |
+| 2026-01-05 | PS-37: Arbitrage Detector - Price differences across stores       |
+| 2026-01-05 | PS-36: Analytics Dashboard - 6 endpoints (trends, correlation)    |
+| 2026-01-05 | PS-35: Automated Scheduled Scraping - 10-minute intervals         |
+| 2026-01-05 | PS-34: Currency Rates Tracking - Dual sources (CBR + open.er)     |
+| 2026-01-05 | PS-33: AliExpress Russia added - 9th store with fallback parser   |
+| 2026-01-05 | PS-28: API Server - Axum REST API (13 endpoints, analytics ready) |
+| 2026-01-04 | PS-29: Scraper Orchestration - Queue + Worker (1,770 lines)       |
+| 2026-01-04 | PS-23: Python Bridge - Rust-Python subprocess communication       |
+| 2026-01-04 | PS-22: Rust workspace initialized - 5 crates compiled             |
+| 2026-01-04 | PS-21: PostgreSQL schema created - 7 tables, 9 stores             |
+| 2026-01-03 | Citilink rate limiting исправлен! Задержки 90-210s, 24.4s         |
+| 2026-01-03 | Avito работает! Исправлен парсер, 9/9 магазинов, 51,799 RUB       |
+| 2026-01-02 | Ozon добавлен! 75,024 RUB через Firefox, 8/9 магазинов            |
+| 2026-01-02 | Yandex Market добавлен! 287,891 RUB, 7/8 магазинов работают       |
+| 2026-01-02 | ALL TESTS PASSED! 6/6 unified test, все методы работают           |
+| 2026-01-02 | test_scrapers.py: citilink_special + firefox xvfb fix             |
+| 2026-01-02 | Citilink работает! Playwright + delay, 10 моделей                 |
+| 2026-01-02 | Добавлен nix.ru (129,563 RUB), 7/7 магазинов работают             |
+| 2026-01-02 | DNS-Shop работает! Firefox + xdotool, 77 моделей                  |
+| 2025-12-31 | PS-19: DNS-Shop - IP banned + Qrator, нет доступа                 |
+| 2025-12-31 | PS-18: Citilink работает! 6 цен MacBook получено                  |
+| 2025-12-31 | PS-17: Деплой на Archbook - i-ray.ru работает!                    |
+| 2025-12-31 | PS-16: Advanced bypass - серверная защита, не обойти              |
+| 2025-12-31 | PS-15: Stealth не обходит Citilink/DNS/Kotofoto                   |
+| 2025-12-31 | Stealth scraper: обход защиты regard.ru (144,400)                 |
+| 2025-12-31 | Найден i-ray.ru: 107,999 RUB, В наличии, verified                 |
+| 2025-12-31 | find_macbook_price.py: верификация товара (5 checks)              |
+| 2025-12-31 | Скрипты поиска MacBook по артикулу Z14V0008D                      |
+| 2025-12-31 | Добавлена интеграция 2Captcha (PS-9)                              |
+| 2025-12-31 | Тесты Playwright: DNS (401), Citilink (CAPTCHA)                   |
+| 2025-12-31 | Создан test_search.py - DuckDuckGo работает                       |
+| 2025-12-31 | Создан LEARNING_PATH.md - путь обучения                           |
+| 2025-12-31 | PS-1 заблокирован: e-katalog.ru недоступен                        |
+| 2025-12-31 | Создан дашборд проекта                                            |
+| 2025-12-31 | Начальная документация проекта                                    |
 
 ---
 
@@ -618,6 +639,319 @@ curl -X POST http://localhost:3000/api/products/1/scrape \
 - [-] Security: Needs authentication (Phase 4)
 
 **Следующий шаг:** PS-30 - Telegram Bot (teloxide integration)
+
+---
+
+### PS-33: Add AliExpress Russia Marketplace
+
+**Статус:** Complete (2026-01-05)
+
+**Цель:** Добавить AliExpress.ru как 9-й marketplace с обходом CAPTCHA защиты.
+
+**Реализовано:**
+- [+] StoreConfig для AliExpress в test_scrapers.py
+- [+] Fallback DOM parser (window.runParams не найден)
+- [+] Playwright Stealth метод (5s задержки)
+- [+] 3 stability tests passed
+- [+] Migration 002_seed_stores.sql updated (unstable=true)
+- [+] TEST_ARTICLE bug fixed (empty string → fallback to query)
+
+**Результат:**
+```
+Store: aliexpress
+Method: playwright_stealth
+Price: 62,110 RUB
+Status: PASS (3/3 stability tests)
+Marked: unstable=true (needs more testing)
+```
+
+**Особенности:**
+- window.runParams extraction не работает (перешли на DOM parsing)
+- XPath селекторы с fallback цепочкой
+- 5s задержки между запросами для обхода rate limiting
+- Артикул TEST_ARTICLE → None для корректного fallback
+
+**Файлы:**
+- scripts/test_scrapers.py:158 - AliExpress StoreConfig
+- migrations/002_seed_stores.sql - AliExpress seed data
+
+---
+
+### PS-34: Currency Rates Tracking
+
+**Статус:** Complete (2026-01-05)
+
+**Цель:** Реализовать отслеживание курсов валют (USD/EUR) из двух источников для корреляционного анализа.
+
+**Реализовано:**
+- [+] Migration 003_add_currency_rates.sql - Схема БД
+- [+] scripts/collect_currency_rates.py - Python скрипт для сбора курсов
+- [+] crates/db/src/lib.rs - Currency methods (save, get_latest, get_history)
+- [+] Dual sources: ЦБ РФ (cbr_ru) + open.er-api.com (open_er)
+
+**Database Schema:**
+```sql
+CREATE TABLE currency_rates (
+    id BIGSERIAL PRIMARY KEY,
+    currency_code TEXT NOT NULL CHECK (currency_code IN ('USD', 'EUR')),
+    rate_to_rub NUMERIC(10, 4) NOT NULL,
+    source TEXT NOT NULL CHECK (source IN ('cbr_ru', 'open_er')),
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**API Sources:**
+- **ЦБ РФ**: https://www.cbr-xml-daily.ru/daily_json.js (ежедневно 11:30 МСК)
+- **open.er-api.com**: https://open.er-api.com/v6/latest/USD (реалтайм, каждые 10 мин)
+
+**Использование:**
+```bash
+# Test dry run
+python3 scripts/collect_currency_rates.py --dry-run
+
+# Collect and save
+python3 scripts/collect_currency_rates.py
+```
+
+**Файлы:**
+- migrations/003_add_currency_rates.sql
+- scripts/collect_currency_rates.py
+- crates/db/src/lib.rs (currency methods)
+
+---
+
+### PS-35: Automated Scheduled Scraping
+
+**Статус:** Complete (2026-01-05)
+
+**Цель:** Автоматизировать сбор цен каждые 10 минут для товаров в диапазоне 5,000-15,000 RUB.
+
+**Реализовано:**
+- [+] crates/scraper/src/scheduler.rs - Scheduler module (188 строк)
+- [+] crates/scraper/src/bin/worker.rs - Continuous worker binary
+- [+] crates/scraper/src/bin/scheduler.rs - One-shot scheduler binary
+- [+] WorkerConfig poll_interval = 600s (10 минут)
+- [+] SchedulerConfig price range (500,000-1,500,000 kopecks)
+- [+] config/price-scout-worker.service - Systemd service
+- [+] config/price-scout-scheduler.timer - Systemd timer
+
+**Архитектура:**
+```
+Scheduler (one-shot)                    Worker (continuous)
+     ↓                                        ↓
+enqueue_all_products()               poll_pending_jobs()
+     ↓                                        ↓
+ScraperQueue (PostgreSQL)            process_batch()
+                                             ↓
+                                    Python Bridge → Scrapers
+```
+
+**Два режима деплоя:**
+1. **Continuous Worker**: Непрерывный опрос очереди каждые 10 минут
+2. **Timer-based Scheduler**: Systemd timer запускает scheduler каждые 10 минут
+
+**Использование:**
+```bash
+# Continuous worker (рекомендуется)
+systemctl enable --now price-scout-worker.service
+
+# Timer-based (альтернатива)
+systemctl enable --now price-scout-scheduler.timer
+```
+
+**Файлы:**
+- crates/scraper/src/scheduler.rs
+- crates/scraper/src/bin/worker.rs
+- crates/scraper/src/bin/scheduler.rs
+- config/price-scout-worker.service
+- config/price-scout-scheduler.timer
+
+---
+
+### PS-36: Analytics Dashboard
+
+**Статус:** Complete (2026-01-05)
+
+**Цель:** Реализовать аналитическую платформу для анализа цен, корреляций и рыночных трендов.
+
+**Реализовано:**
+- [+] 4 SQL analytics queries в crates/db/src/lib.rs:
+  - get_price_trends() - Дневная агрегация цен с volatility (STDDEV)
+  - calculate_price_currency_correlation() - Pearson correlation
+  - get_store_comparison() - Сравнение магазинов по ценам и доступности
+  - get_market_overview() - Агрегированная статистика рынка
+- [+] 4 REST API endpoints в crates/api/src/main.rs:
+  - GET /api/analytics/price-trends/:id?days=7
+  - GET /api/analytics/currency-correlation/:id?currency=USD&days=30
+  - GET /api/analytics/store-comparison/:id?days=30
+  - GET /api/analytics/market-overview?min_price=5000&max_price=15000
+- [+] docs/ANALYTICS_API.md - Полная документация (11KB)
+- [+] docs/REST_API.md - Обновлена с новыми endpoints
+
+**Ключевые возможности:**
+- **Price Trends**: Отслеживание изменений цен во времени с volatility index
+- **Currency Correlation**: Выявление импортных товаров (высокая корреляция с USD/EUR)
+- **Store Comparison**: Поиск лучших магазинов (цена + доступность)
+- **Market Overview**: Общая картина рынка в ценовом диапазоне
+
+**Использование:**
+```bash
+# Price trends
+curl "http://localhost:3000/api/analytics/price-trends/1?days=30" | jq
+
+# Currency correlation
+curl "http://localhost:3000/api/analytics/currency-correlation/1?currency=USD" | jq
+
+# Store comparison
+curl "http://localhost:3000/api/analytics/store-comparison/1?days=7" | jq
+
+# Market overview
+curl "http://localhost:3000/api/analytics/market-overview?min_price=5000&max_price=15000" | jq
+```
+
+**Файлы:**
+- crates/db/src/lib.rs (analytics methods)
+- crates/api/src/main.rs (analytics endpoints)
+- docs/ANALYTICS_API.md
+
+---
+
+### PS-37: Arbitrage Detector
+
+**Статус:** Complete (2026-01-05)
+
+**Цель:** Обнаружение арбитражных возможностей (разница цен между магазинами на один товар).
+
+**Реализовано:**
+- [+] find_arbitrage_opportunities() SQL query в crates/db/src/lib.rs
+- [+] GET /api/arbitrage?min_profit=10 REST endpoint
+- [+] docs/ANALYTICS_API.md updated с arbitrage section
+- [+] CTE-based query с cross-store joins
+
+**SQL Logic:**
+```sql
+WITH price_pairs AS (
+  SELECT
+    product_id,
+    buy_store_id,
+    buy_price,
+    sell_store_id,
+    sell_price,
+    (sell_price - buy_price) as profit,
+    ((sell_price - buy_price)::float / buy_price::float * 100) as profit_percent
+  FROM products
+  JOIN store_prices sp1 ON product_id = sp1.product_id
+  JOIN store_prices sp2 ON product_id = sp2.product_id
+  WHERE sp1.store_id != sp2.store_id
+    AND sell_price > buy_price
+    AND profit_percent >= min_profit
+)
+SELECT * FROM price_pairs
+ORDER BY profit_percent DESC LIMIT 100
+```
+
+**Response Example:**
+```json
+{
+  "opportunities": [
+    {
+      "product_name": "MacBook Pro 16\" M1 Pro",
+      "buy_store": "dns-shop",
+      "buy_price": 10500000,
+      "sell_store": "ozon",
+      "sell_price": 12000000,
+      "profit_percent": 14.29
+    }
+  ],
+  "count": 1
+}
+```
+
+**Use Cases:**
+- Поиск лучших предложений для покупателей
+- Мониторинг конкурентных цен для ритейлеров
+- Выявление ошибок ценообразования
+- Анализ эффективности рынка
+
+**Файлы:**
+- crates/db/src/lib.rs:716-792
+- crates/api/src/main.rs:502-548
+- docs/ANALYTICS_API.md:210-287
+
+---
+
+### PS-38: ML Price Predictions (Random Forest)
+
+**Статус:** Complete (2026-01-05)
+
+**Цель:** Прогнозирование цен на 7 дней вперёд с помощью машинного обучения.
+
+**Реализовано:**
+- [+] scripts/ml_predictor.py - Python ML trainer/predictor (14KB)
+- [+] GET /api/analytics/predictions/:id REST endpoint
+- [+] docs/ANALYTICS_API.md updated с predictions section
+- [+] scripts/ML_PREDICTIONS_README.md - Полная документация (11KB)
+
+**ML Model:**
+- **Algorithm**: Random Forest Regressor (100 trees, max depth 10)
+- **Training split**: 80/20 (time-ordered, no shuffle)
+- **Features** (7):
+  1. price_7d_avg - 7-дневная скользящая средняя
+  2. price_30d_avg - 30-дневная скользящая средняя
+  3. price_trend - Изменение цены за 7 дней
+  4. usd_rate - Курс USD → RUB
+  5. eur_rate - Курс EUR → RUB
+  6. day_of_week - День недели (0=Mon, 6=Sun)
+  7. days_since_start - Дни с начала наблюдений
+- **Target**: Цена через 7 дней
+- **Confidence interval**: ±2σ (~95%)
+- **Model persistence**: models/product_{id}_predictor.pkl
+
+**Usage:**
+```bash
+# Train model
+python3 scripts/ml_predictor.py train --product-id 1
+
+# Predict via CLI
+python3 scripts/ml_predictor.py predict --product-id 1 --output json
+
+# Predict via API
+curl "http://localhost:3000/api/analytics/predictions/1" | jq
+```
+
+**Response Example:**
+```json
+{
+  "product_id": 1,
+  "current_price": 10500000,
+  "predicted_price": 10350000,
+  "prediction_horizon_days": 7,
+  "lower_bound": 10100000,
+  "upper_bound": 10600000,
+  "confidence": "medium",
+  "model_accuracy": {
+    "r2_score": 0.78,
+    "mae_rub": 1250.32
+  }
+}
+```
+
+**Confidence Levels:**
+- **high**: R² > 0.7 (надёжные прогнозы)
+- **medium**: R² 0.5-0.7 (умеренная точность)
+- **low**: R² < 0.5 (ограниченная точность)
+
+**Requirements:**
+- Minimum 20 days of historical data
+- 60+ days recommended for better accuracy
+- Currency rate data for same period
+- Python packages: pandas, scikit-learn, psycopg2-binary, joblib
+
+**Файлы:**
+- scripts/ml_predictor.py (ML trainer/predictor)
+- scripts/ML_PREDICTIONS_README.md (documentation)
+- crates/api/src/main.rs:576-608 (API endpoint)
+- docs/ANALYTICS_API.md:290-414 (API specs)
 
 ---
 

@@ -14,10 +14,12 @@ price-scout-models = { path = "../models" }
 price-scout-db = { path = "../db" }
 
 tokio = { workspace = true }
-teloxide = { workspace = true }
+teloxide = { workspace = true, features = ["macros"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenv = { workspace = true }
+chrono = { workspace = true }
