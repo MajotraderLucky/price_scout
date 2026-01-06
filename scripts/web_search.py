@@ -96,6 +96,15 @@ def extract_prices(text: str) -> list:
     return sorted(set(prices))
 
 
+def get_base_domain(domain: str) -> str:
+    """Extract base domain from subdomain (krasnoyarsk.tempgun.ru -> tempgun.ru)"""
+    parts = domain.split('.')
+    if len(parts) >= 2:
+        # Return last two parts (domain.tld)
+        return '.'.join(parts[-2:])
+    return domain
+
+
 def search_prices(query: str, max_results: int = 20) -> dict:
     """Search for prices using DuckDuckGo."""
     results = {
@@ -103,6 +112,7 @@ def search_prices(query: str, max_results: int = 20) -> dict:
         "results": [],
         "error": None
     }
+    seen_domains = set()  # For deduplication
 
     try:
         with DDGS() as ddgs:
@@ -126,6 +136,12 @@ def search_prices(query: str, max_results: int = 20) -> dict:
             is_aggregator = any(agg in domain for agg in AGGREGATORS)
             if is_aggregator:
                 continue
+
+            # Deduplicate by base domain (krasnoyarsk.tempgun.ru -> tempgun.ru)
+            base_domain = get_base_domain(domain)
+            if base_domain in seen_domains:
+                continue
+            seen_domains.add(base_domain)
 
             # Extract prices from title and snippet
             combined_text = f"{title} {snippet}"

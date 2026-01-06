@@ -166,11 +166,27 @@ async fn handle_command(bot: Bot, msg: Message, cmd: Command, db: Database) -> R
 fn clean_search_query(text: &str) -> String {
     let mut result = text.trim().to_string();
 
-    // Remove common prefixes (case-insensitive)
+    // Remove common emoji prefixes
+    let emoji_prefixes = ["🔍", "🌐", "💰", "📈", "😕", "❌"];
+    for emoji in emoji_prefixes {
+        if result.starts_with(emoji) {
+            result = result[emoji.len()..].trim_start().to_string();
+        }
+    }
+
+    // Remove common text prefixes (case-insensitive) - may need multiple passes
     let prefixes = ["ищу:", "ищу", "найти:", "найти", "поиск:", "поиск", "купить:", "купить"];
-    for prefix in prefixes {
-        if result.to_lowercase().starts_with(prefix) {
-            result = result[prefix.len()..].trim_start().to_string();
+    for _ in 0..2 {  // Two passes to handle "🔍 Ищу: Ищу:"
+        for prefix in &prefixes {
+            if result.to_lowercase().starts_with(prefix) {
+                result = result[prefix.len()..].trim_start().to_string();
+            }
+        }
+        // Also check emoji again after text removal
+        for emoji in &emoji_prefixes {
+            if result.starts_with(*emoji) {
+                result = result[emoji.len()..].trim_start().to_string();
+            }
         }
     }
 
