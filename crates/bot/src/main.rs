@@ -162,24 +162,45 @@ async fn handle_command(bot: Bot, msg: Message, cmd: Command, db: Database) -> R
     answer(bot, msg, cmd, db).await
 }
 
+/// Clean search query from common prefixes and noise
+fn clean_search_query(text: &str) -> String {
+    let mut result = text.trim().to_string();
+
+    // Remove common prefixes (case-insensitive)
+    let prefixes = ["ищу:", "ищу", "найти:", "найти", "поиск:", "поиск", "купить:", "купить"];
+    for prefix in prefixes {
+        if result.to_lowercase().starts_with(prefix) {
+            result = result[prefix.len()..].trim_start().to_string();
+        }
+    }
+
+    // Remove trailing dots
+    result = result.trim_end_matches('.').trim().to_string();
+
+    result
+}
+
 /// Handle plain text messages (smart search)
 async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseResult<()> {
-    let text = match msg.text() {
+    let raw_text = match msg.text() {
         Some(t) => t.trim(),
         None => return Ok(()),
     };
 
+    // Clean the search query
+    let text = clean_search_query(raw_text);
+
     // Ignore short messages and commands
-    if text.len() < 3 || text.starts_with('/') {
+    if text.len() < 3 || raw_text.starts_with('/') {
         return Ok(());
     }
 
     let chat_id = msg.chat.id;
-    info!("Text message received: '{}'", text);
+    info!("Text message received: '{}' -> cleaned: '{}'", raw_text, text);
 
     bot.send_message(chat_id, format!("🔍 Ищу: {}...", text)).await?;
 
-    match db.search_products(text).await {
+    match db.search_products(&text).await {
         Ok(products) => {
             match products.len() {
                 0 => {
@@ -187,7 +208,7 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
                     bot.send_message(chat_id, "😕 Товар не найден в БД. Ищу в интернете...")
                         .await?;
 
-                    match call_web_search(text, 15).await {
+                    match call_web_search(&text, 15).await {
                         Ok(results) => {
                             let response = format_web_search_results(&results);
                             bot.send_message(chat_id, response)
@@ -210,7 +231,7 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
                     bot.send_message(chat_id, "🌐 Ищу лучшие цены в интернете...")
                         .await?;
 
-                    match call_web_search(text, 15).await {
+                    match call_web_search(&text, 15).await {
                         Ok(results) => {
                             let response = format_web_search_results(&results);
                             bot.send_message(chat_id, response)
