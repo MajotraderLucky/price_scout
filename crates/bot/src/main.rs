@@ -21,6 +21,8 @@
 //! - /top [limit] - Show top popular products
 //! - /track <product_id> <target_price> - Track product (future)
 
+mod notifications;
+
 use anyhow::{Context, Result};
 use price_scout_db::Database;
 use price_scout_models::{Product, ProductPopularity, StorePrice, Store};
@@ -32,7 +34,7 @@ use teloxide::{
     types::{ParseMode, Update},
     utils::command::BotCommands,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Price prediction response from ML model
 #[derive(Debug, Serialize, Deserialize)]
@@ -136,6 +138,15 @@ async fn main() -> Result<()> {
 
     info!("✅ Bot initialized");
     info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    // Start notification poller in background
+    let bot_for_notifier = bot.clone();
+    let db_for_notifier = db.clone();
+    tokio::spawn(async move {
+        notifications::notification_poller(bot_for_notifier, db_for_notifier).await;
+    });
+    info!("✅ Notification poller started");
+
     info!("🚀 Bot is running...");
 
     // Set up handler with commands and text messages
@@ -396,6 +407,24 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
 
     match cmd {
         Command::Start => {
+            // Save user's chat_id for notifications
+            if let Some(user) = &msg.from {
+                let telegram_id = user.id.0 as i64;
+                let username = user.username.as_deref();
+
+                // Upsert user
+                if let Err(e) = db.upsert_user(telegram_id, username).await {
+                    warn!("Failed to upsert user: {}", e);
+                }
+
+                // Update chat_id for notifications
+                if let Err(e) = db.update_user_chat_id(telegram_id, chat_id.0).await {
+                    warn!("Failed to update chat_id: {}", e);
+                } else {
+                    info!("Saved chat_id {} for user {}", chat_id.0, telegram_id);
+                }
+            }
+
             bot.send_message(chat_id, format_start_message())
                 .parse_mode(ParseMode::Html)
                 .await?;
@@ -686,8 +715,16 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
 
 // Message formatting functions
 
+/// Generate compact command hints footer for all messages
+fn format_command_hints_footer() -> &'static str {
+    "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
+     <b>Commands:</b>\n\
+     /start /help /search /price /trends\n\
+     /predict /arbitrage /compare /web /top"
+}
+
 fn format_start_message() -> String {
-    r#"👋 <b>Welcome to Price Scout Bot!</b>
+    format!(r#"👋 <b>Welcome to Price Scout Bot!</b>
 
 I help you track electronics prices across Russian marketplaces and find the best deals.
 
@@ -704,11 +741,13 @@ Try: /search MacBook Pro 16
 Use /help to see all commands.
 
 <b>Powered by</b> Price Scout Analytics Platform
-"#.to_string()
+{}"#,
+        format_command_hints_footer()
+    )
 }
 
 fn format_help_message() -> String {
-    r#"<b>Available Commands:</b>
+    format!(r#"<b>Available Commands:</b>
 
 <b>Basic:</b>
 /search &lt;query&gt; - Search for products
@@ -735,7 +774,9 @@ Just type product name - bot will search DB and web!
 
 <b>Coming Soon:</b>
 /track &lt;id&gt; &lt;price&gt; - Set price alert
-"#.to_string()
+{}"#,
+        format_command_hints_footer()
+    )
 }
 
 fn format_search_results(products: &[Product]) -> String {
@@ -756,6 +797,7 @@ fn format_search_results(products: &[Product]) -> String {
     }
 
     response.push_str("\n💡 <i>Use /price &lt;id&gt; to see prices</i>");
+    response.push_str(format_command_hints_footer());
 
     response
 }
@@ -794,6 +836,7 @@ fn format_price_data(product: &Product, price_data: &[(StorePrice, Store)]) -> S
     }
 
     response.push_str(&format!("\n💡 <i>Use /trends {} to see price history</i>", product.id));
+    response.push_str(format_command_hints_footer());
 
     response
 }
@@ -837,6 +880,7 @@ fn format_price_trends(product_id: i64, trends: &[(chrono::NaiveDate, f64, i32, 
     }
 
     response.push_str(&format!("\n💡 <i>Use /predict {} for ML forecast</i>", product_id));
+    response.push_str(format_command_hints_footer());
 
     response
 }
@@ -880,7 +924,7 @@ fn format_price_prediction(pred: &PricePredictionResponse) -> String {
 
 <i>Prediction made: {}</i>
 <i>Model trained: {}</i>
-"#,
+{}"#,
         pred.product_id,
         current,
         predicted,
@@ -895,6 +939,7 @@ fn format_price_prediction(pred: &PricePredictionResponse) -> String {
         pred.model_accuracy.mae_rub,
         pred.predicted_at,
         pred.model_trained_at,
+        format_command_hints_footer(),
     )
 }
 
@@ -944,6 +989,7 @@ fn format_arbitrage(opportunities: &[(i64, String, String, i64, String, i32, i64
         response.push_str(&format!("\n<i>... and {} more opportunities</i>", opportunities.len() - 5));
     }
 
+    response.push_str(format_command_hints_footer());
     response
 }
 
@@ -974,6 +1020,7 @@ fn format_store_comparison(product_id: i64, stores: &[(String, f64, i64, f64)]) 
 
     response.push_str("\n💡 <i>Lower average = better price</i>");
     response.push_str("\n💡 <i>Higher availability = more reliable</i>");
+    response.push_str(format_command_hints_footer());
 
     response
 }
@@ -1030,6 +1077,7 @@ fn format_web_search_results(response: &WebSearchResponse) -> String {
         }
     }
 
+    msg.push_str(format_command_hints_footer());
     msg
 }
 
@@ -1083,6 +1131,7 @@ fn format_top_products(products: &[ProductPopularity]) -> String {
     msg.push_str("T=отслеживания, V=волатильность,\n");
     msg.push_str("A=наличие, R=арбитраж\n\n");
     msg.push_str("💡 <i>/price &lt;id&gt; для просмотра цен</i>");
+    msg.push_str(format_command_hints_footer());
 
     msg
 }

@@ -36,7 +36,11 @@ debug_*.png
 # Temporary files
 tmp/
 temp/
+temp_repo/
 *.tmp
+
+# Browser profiles (for scraping)
+browser_profiles/
 
 # Redis dump
 dump.rdb

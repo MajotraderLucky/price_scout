@@ -196,6 +196,84 @@ impl JobStatus {
 }
 
 // ============================================================================
+// NOTIFICATION MODELS
+// ============================================================================
+
+/// User with notification preferences
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct UserNotification {
+    pub id: i64,
+    pub telegram_id: i64,
+    pub chat_id: Option<i64>,
+    pub username: Option<String>,
+    pub notifications_enabled: bool,
+}
+
+/// Scraping batch statistics for notifications
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct ScrapingBatch {
+    pub id: i64,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub jobs_total: i32,
+    pub jobs_success: i32,
+    pub jobs_failed: i32,
+    pub price_changes: i32,
+    pub notification_sent: bool,
+}
+
+/// Price change event detected during scraping
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct PriceChangeEvent {
+    pub id: i64,
+    pub batch_id: i64,
+    pub product_id: i64,
+    pub store_id: i32,
+    pub old_price: i32,
+    pub new_price: i32,
+    pub change_percent: f64,
+    pub detected_at: DateTime<Utc>,
+}
+
+impl PriceChangeEvent {
+    /// Old price in rubles
+    pub fn old_price_rub(&self) -> f64 {
+        self.old_price as f64 / 100.0
+    }
+
+    /// New price in rubles
+    pub fn new_price_rub(&self) -> f64 {
+        self.new_price as f64 / 100.0
+    }
+
+    /// Price change in rubles
+    pub fn change_rub(&self) -> f64 {
+        (self.new_price - self.old_price) as f64 / 100.0
+    }
+}
+
+/// Price change with product name for display
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct PriceChangeWithProduct {
+    pub product_id: i64,
+    pub product_name: String,
+    pub store_name: String,
+    pub old_price: i32,
+    pub new_price: i32,
+    pub change_percent: f64,
+}
+
+/// Notification log entry
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct NotificationLog {
+    pub id: i64,
+    pub user_id: i64,
+    pub batch_id: Option<i64>,
+    pub notification_type: String,
+    pub sent_at: DateTime<Utc>,
+}
+
+// ============================================================================
 // SCRAPER RESPONSE MODELS
 // ============================================================================
 

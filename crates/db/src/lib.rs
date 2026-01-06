@@ -1151,4 +1151,212 @@ impl Database {
 
         Ok(products)
     }
+
+    // ========================================================================
+    // NOTIFICATION OPERATIONS
+    // ========================================================================
+
+    /// Update user's chat_id for notifications
+    pub async fn update_user_chat_id(&self, telegram_id: i64, chat_id: i64) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE users
+            SET chat_id = $2
+            WHERE telegram_id = $1
+            "#,
+        )
+        .bind(telegram_id)
+        .bind(chat_id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to update user chat_id")?;
+
+        Ok(())
+    }
+
+    /// Get all users with notifications enabled
+    pub async fn get_notification_recipients(&self) -> Result<Vec<UserNotification>> {
+        let users = sqlx::query_as::<_, UserNotification>(
+            r#"
+            SELECT id, telegram_id, chat_id, username, notifications_enabled
+            FROM users
+            WHERE notifications_enabled = true AND chat_id IS NOT NULL
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch notification recipients")?;
+
+        Ok(users)
+    }
+
+    /// Create a new scraping batch
+    pub async fn create_scraping_batch(&self) -> Result<i64> {
+        let batch_id = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO scraping_batches (started_at) VALUES (NOW()) RETURNING id",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to create scraping batch")?;
+
+        Ok(batch_id)
+    }
+
+    /// Update scraping batch statistics
+    pub async fn update_scraping_batch(
+        &self,
+        batch_id: i64,
+        jobs_total: i32,
+        jobs_success: i32,
+        jobs_failed: i32,
+        price_changes: i32,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE scraping_batches
+            SET completed_at = NOW(),
+                jobs_total = $2,
+                jobs_success = $3,
+                jobs_failed = $4,
+                price_changes = $5
+            WHERE id = $1
+            "#,
+        )
+        .bind(batch_id)
+        .bind(jobs_total)
+        .bind(jobs_success)
+        .bind(jobs_failed)
+        .bind(price_changes)
+        .execute(&self.pool)
+        .await
+        .context("Failed to update scraping batch")?;
+
+        Ok(())
+    }
+
+    /// Get unnotified completed batches
+    pub async fn get_unnotified_batches(&self) -> Result<Vec<ScrapingBatch>> {
+        let batches = sqlx::query_as::<_, ScrapingBatch>(
+            r#"
+            SELECT * FROM scraping_batches
+            WHERE notification_sent = false AND completed_at IS NOT NULL
+            ORDER BY completed_at ASC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch unnotified batches")?;
+
+        Ok(batches)
+    }
+
+    /// Mark batch as notified
+    pub async fn mark_batch_notified(&self, batch_id: i64) -> Result<()> {
+        sqlx::query("UPDATE scraping_batches SET notification_sent = true WHERE id = $1")
+            .bind(batch_id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to mark batch as notified")?;
+
+        Ok(())
+    }
+
+    /// Record price change event
+    pub async fn record_price_change(
+        &self,
+        batch_id: i64,
+        product_id: i64,
+        store_id: i32,
+        old_price: i32,
+        new_price: i32,
+        change_percent: f64,
+    ) -> Result<i64> {
+        let event_id = sqlx::query_scalar::<_, i64>(
+            r#"
+            INSERT INTO price_change_events
+                (batch_id, product_id, store_id, old_price, new_price, change_percent)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id
+            "#,
+        )
+        .bind(batch_id)
+        .bind(product_id)
+        .bind(store_id)
+        .bind(old_price)
+        .bind(new_price)
+        .bind(change_percent)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to record price change")?;
+
+        Ok(event_id)
+    }
+
+    /// Get price changes for a batch with product/store names
+    pub async fn get_batch_price_changes(&self, batch_id: i64) -> Result<Vec<PriceChangeWithProduct>> {
+        let changes = sqlx::query_as::<_, PriceChangeWithProduct>(
+            r#"
+            SELECT
+                e.product_id,
+                p.name as product_name,
+                s.name as store_name,
+                e.old_price,
+                e.new_price,
+                e.change_percent
+            FROM price_change_events e
+            JOIN products p ON e.product_id = p.id
+            JOIN stores s ON e.store_id = s.id
+            WHERE e.batch_id = $1
+            ORDER BY ABS(e.change_percent) DESC
+            LIMIT 10
+            "#,
+        )
+        .bind(batch_id)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch batch price changes")?;
+
+        Ok(changes)
+    }
+
+    /// Get current price for product/store (for change detection)
+    pub async fn get_current_price(&self, product_id: i64, store_id: i32) -> Result<Option<i32>> {
+        let price = sqlx::query_scalar::<_, i32>(
+            r#"
+            SELECT price FROM store_prices
+            WHERE product_id = $1 AND store_id = $2
+            "#,
+        )
+        .bind(product_id)
+        .bind(store_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to fetch current price")?;
+
+        Ok(price)
+    }
+
+    /// Log notification sent
+    pub async fn log_notification(
+        &self,
+        user_id: i64,
+        batch_id: Option<i64>,
+        notification_type: &str,
+    ) -> Result<i64> {
+        let log_id = sqlx::query_scalar::<_, i64>(
+            r#"
+            INSERT INTO notification_log (user_id, batch_id, notification_type)
+            VALUES ($1, $2, $3)
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(batch_id)
+        .bind(notification_type)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to log notification")?;
+
+        Ok(log_id)
+    }
 }

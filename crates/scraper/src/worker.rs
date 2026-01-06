@@ -139,7 +139,13 @@ impl ScraperWorker {
             return Ok(0);
         }
 
-        debug!("Processing batch of {} jobs", jobs.len());
+        // Create a new scraping batch for notifications
+        let batch_id = self.queue.db().create_scraping_batch().await?;
+        debug!("Processing batch {} of {} jobs", batch_id, jobs.len());
+
+        let mut success_count = 0i32;
+        let mut fail_count = 0i32;
+        let mut price_changes_count = 0i32;
 
         for job in &jobs {
             if self.shutdown.load(Ordering::Relaxed) {
@@ -147,12 +153,47 @@ impl ScraperWorker {
                 break;
             }
 
-            if let Err(e) = self.process_job(job).await {
-                error!("Failed to process job {}: {:#}", job.id, e);
+            match self.process_job_with_tracking(job, batch_id).await {
+                Ok(price_changed) => {
+                    success_count += 1;
+                    if price_changed {
+                        price_changes_count += 1;
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to process job {}: {:#}", job.id, e);
+                    fail_count += 1;
+                }
             }
         }
 
+        // Update batch statistics
+        if let Err(e) = self.queue.db().update_scraping_batch(
+            batch_id,
+            jobs.len() as i32,
+            success_count,
+            fail_count,
+            price_changes_count,
+        ).await {
+            warn!("Failed to update batch statistics: {}", e);
+        }
+
+        info!(
+            "Batch {} complete: {} success, {} failed, {} price changes",
+            batch_id, success_count, fail_count, price_changes_count
+        );
+
         Ok(jobs.len())
+    }
+
+    /// Process a single job with price change tracking
+    async fn process_job_with_tracking(&self, job: &ScrapingJob, _batch_id: i64) -> Result<bool> {
+        // Process the job normally
+        self.process_job(job).await?;
+
+        // Return false for now - price change detection can be enhanced later
+        // to track actual price changes and record them to price_change_events
+        Ok(false)
     }
 
     /// Process a single job
