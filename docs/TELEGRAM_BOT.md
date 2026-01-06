@@ -10,19 +10,23 @@ Interactive Telegram bot for price tracking and analytics.
 - **ML Predictions**: Get AI-powered 7-day price forecasts
 - **Arbitrage Detection**: Find profitable price differences across stores
 - **Store Comparison**: Compare stores by average price and reliability
+- **Web Search**: Search products via DuckDuckGo with price extraction
+- **Top Products**: View popular products by popularity score (1,000-15,000 RUB)
 
 ## Bot Commands
 
-| Command                        | Description                      | Example                  |
-|--------------------------------|----------------------------------|--------------------------|
-| `/start`                       | Welcome message and introduction | `/start`                 |
-| `/help`                        | Show all available commands      | `/help`                  |
-| `/search <query>`              | Search for products              | `/search MacBook Pro 16` |
-| `/price <product_id>`          | Get current prices               | `/price 1`               |
-| `/trends <product_id> [days]`  | Show price trends                | `/trends 1 7`            |
-| `/predict <product_id>`        | Get ML price prediction          | `/predict 1`             |
-| `/arbitrage [min_profit]`      | Find arbitrage opportunities     | `/arbitrage 10`          |
-| `/compare <product_id> [days]` | Compare stores                   | `/compare 1 30`          |
+| Command                        | Description                      | Example                   |
+|--------------------------------|----------------------------------|---------------------------|
+| `/start`                       | Welcome message and introduction | `/start`                  |
+| `/help`                        | Show all available commands      | `/help`                   |
+| `/search <query>`              | Search for products              | `/search MacBook Pro 16`  |
+| `/price <product_id>`          | Get current prices               | `/price 1`                |
+| `/trends <product_id> [days]`  | Show price trends                | `/trends 1 7`             |
+| `/predict <product_id>`        | Get ML price prediction          | `/predict 1`              |
+| `/arbitrage [min_profit]`      | Find arbitrage opportunities     | `/arbitrage 10`           |
+| `/compare <product_id> [days]` | Compare stores                   | `/compare 1 30`           |
+| `/web <query>`                 | Web search via DuckDuckGo        | `/web рогатка centershot` |
+| `/top [limit]`                 | Top popular products (1-15K RUB) | `/top 20`                 |
 
 ## Setup
 
@@ -198,6 +202,56 @@ Product: MacBook Pro 16" M3 Max
 
 [i] Lower average = better price
 [i] Higher availability = more reliable
+```
+
+### 7. Web Search (DuckDuckGo)
+
+```
+/web рогатка centershot
+
+[W] Web Search: рогатка centershot
+
+Found 5 results with prices:
+
+1. centershot.ru
+   [$] от 1,900 ₽
+   [L] https://centershot.ru/...
+
+2. ozon.ru
+   [$] от 2,100 ₽
+   [L] https://ozon.ru/...
+
+3. wildberries.ru
+   [$] от 1,850 ₽
+   [L] https://wildberries.ru/...
+
+[i] Prices extracted from search results
+```
+
+### 8. Top Popular Products
+
+```
+/top 10
+
+[T] Top 10 Popular Products
+(price range: 1,000 - 15,000 ₽)
+
+1. Xiaomi Mi Band 8
+   [R] Rating: 85/100 | [S] 6 stores
+   [$] 2,500 - 4,200 ₽ | [C] electronics
+   T:32 V:25 A:18 R:10
+
+2. JBL Tune 520BT
+   [R] Rating: 72/100 | [S] 5 stores
+   [$] 3,800 - 5,500 ₽ | [C] electronics
+   T:28 V:20 A:16 R:8
+
+...
+
+Score breakdown:
+T=tracking, V=volatility, A=availability, R=arbitrage
+
+[i] Use /price <id> to view prices
 ```
 
 ## Architecture
@@ -515,6 +569,6 @@ Command::Track(args) => {
 
 ---
 
-**Bot Version**: 0.1.0
-**Last Updated**: 2026-01-05
-**Status**: ✅ Ready for Testing
+**Bot Version**: 0.2.0
+**Last Updated**: 2026-01-06
+**Status**: [+] Production Ready

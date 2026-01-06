@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-06 (PS-8 Telegram Bot Complete)
+> Последнее обновление: 2026-01-06 (PS-39 Market Research System Complete)
 
 ---
 
@@ -31,7 +31,8 @@
 
 | ID    | Задача                                 | Дата       | Результат                         |
 |-------|----------------------------------------|------------|-----------------------------------|
-| PS-8  | Telegram Bot (teloxide)                | 2026-01-06 | 8 commands, standalone DB mode    |
+| PS-39 | Market Research System                 | 2026-01-06 | Top 100, discovery, /top command  |
+| PS-8  | Telegram Bot (teloxide)                | 2026-01-06 | 10 commands, standalone DB mode   |
 | PS-38 | ML Price Predictions (Random Forest)   | 2026-01-05 | 7-day forecasts, Python ML script |
 | PS-37 | Arbitrage Detector                     | 2026-01-05 | Price differences across stores   |
 | PS-36 | Analytics Dashboard                    | 2026-01-05 | 6 endpoints (trends, correlation) |
@@ -105,23 +106,32 @@
 
 | Метрика           | Значение         |
 |-------------------|------------------|
-| Фаза              | Phase 3 Complete |
-| Статус            | Analytics Ready  |
+| Фаза              | Phase 4 Complete |
+| Статус            | Market Research  |
 | Задач в Backlog   | 4                |
 | Задач In Progress | 0                |
 | Задач в Review    | 2                |
-| Задач Done        | 24               |
-| Python скриптов   | 24               |
-| Rust modules      | 9                |
-| Документов        | 19               |
+| Задач Done        | 25               |
+| Python скриптов   | 25               |
+| Rust modules      | 10               |
+| Bot commands      | 10               |
+| Документов        | 20               |
 
 ---
 
 ## Current Focus
 
-**Статус: ANALYTICS PLATFORM COMPLETE - Phase 3 Done!**
+**Статус: MARKET RESEARCH SYSTEM COMPLETE - Phase 4 Done!**
 
-**Новые возможности:**
+**Новые возможности (Phase 4):**
+- [+] Market Research System: Top 100 популярных товаров (1,000-15,000 RUB)
+- [+] Product Discovery: DuckDuckGo поиск + hourly scheduler
+- [+] Popularity Scoring: 4 метрики (tracking, volatility, availability, arbitrage)
+- [+] Telegram /top command: Просмотр рейтинга популярности
+- [+] Telegram /web command: Веб-поиск через DuckDuckGo
+- [+] API endpoints: /api/market-research/* (top-100, popular-queries, categories)
+
+**Возможности (Phase 3):**
 - [+] Analytics API (6 endpoints): Price trends, currency correlation, store comparison, market overview
 - [+] Arbitrage detector: Find price differences across stores (10%+ profit opportunities)
 - [+] ML Price predictions: 7-day forecasts using Random Forest (Python + scikit-learn)
@@ -209,7 +219,8 @@
 
 | Дата       | Изменение                                                         |
 |------------|-------------------------------------------------------------------|
-| 2026-01-06 | PS-8: Telegram Bot - teloxide, 8 commands, standalone mode        |
+| 2026-01-06 | PS-39: Market Research - Top 100, discovery, /top, /web commands  |
+| 2026-01-06 | PS-8: Telegram Bot - teloxide, 10 commands, standalone mode       |
 | 2026-01-05 | PS-38: ML Price Predictions - Random Forest 7-day forecasts       |
 | 2026-01-05 | PS-37: Arbitrage Detector - Price differences across stores       |
 | 2026-01-05 | PS-36: Analytics Dashboard - 6 endpoints (trends, correlation)    |
@@ -250,6 +261,71 @@
 ---
 
 ## Описание задач
+
+### PS-39: Market Research System
+
+**Статус:** Complete (2026-01-06)
+
+**Цель:** Система автоматического обнаружения товаров и рейтинга популярности для поддержания Top 100 товаров в ценовом диапазоне 1,000-15,000 RUB.
+
+**Реализовано:**
+- [+] Migration 004_market_research.sql - Новые таблицы и materialized view
+- [+] Rust модели: SearchQuery, DiscoveryJob, ProductPopularity
+- [+] DB методы: get_top_products, record_search_query, refresh_popularity_metrics
+- [+] Python Discovery Engine (scripts/discovery.py)
+- [+] API endpoints: /api/market-research/* (4 endpoints)
+- [+] Telegram команда /top [limit]
+- [+] Hourly discovery scheduler (systemd timer)
+
+**Формула рейтинга популярности (0-100):**
+
+| Критерий     | Вес | Описание                    |
+|--------------|-----|-----------------------------|
+| Tracking     | 40% | Частота отслеживания        |
+| Volatility   | 30% | Волатильность цены          |
+| Availability | 20% | Наличие в магазинах         |
+| Arbitrage    | 10% | Арбитражный потенциал       |
+
+**Новые таблицы БД:**
+- `search_queries` - Отслеживание поисковых запросов
+- `discovery_jobs` - Очередь задач обнаружения
+- `mv_product_popularity` - Materialized view рейтинга
+- `v_top_100_products` - View Top 100 товаров
+
+**Telegram бот (10 команд):**
+
+| Команда                      | Описание                           |
+|------------------------------|------------------------------------|
+| /start                       | Приветствие                        |
+| /help                        | Список команд                      |
+| /search <query>              | Поиск товаров                      |
+| /price <id>                  | Цены товара                        |
+| /trends <id> [days]          | Тренды цен                         |
+| /predict <id>                | ML прогноз                         |
+| /arbitrage [min_profit]      | Арбитраж                           |
+| /compare <id> [days]         | Сравнение магазинов                |
+| /web <query>                 | Веб-поиск DuckDuckGo               |
+| /top [limit]                 | Top популярных товаров             |
+
+**API endpoints:**
+```
+GET  /api/market-research/top-100          - Top 100 товаров
+GET  /api/market-research/popular-queries  - Популярные запросы
+GET  /api/market-research/categories       - Категории товаров
+POST /api/market-research/refresh          - Обновить рейтинги
+```
+
+**Файлы:**
+- migrations/004_market_research.sql
+- crates/models/src/lib.rs (Market Research models)
+- crates/db/src/lib.rs (Market Research methods)
+- crates/api/src/main.rs (Market Research endpoints)
+- crates/bot/src/main.rs (/top, /web commands)
+- scripts/discovery.py
+- config/price-scout-discovery.service
+- config/price-scout-discovery.timer
+
+---
 
 ### PS-20: Управление Citilink Rate Limiting
 
