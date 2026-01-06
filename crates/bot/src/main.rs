@@ -955,13 +955,18 @@ fn format_web_search_results(response: &WebSearchResponse) -> String {
     if with_prices.is_empty() {
         msg.push_str("😕 Цены не найдены в результатах поиска.\n\n");
 
-        // Show first few results without prices
+        // Show first few results without prices (with links)
         let other_results: Vec<_> = response.results.iter().take(3).collect();
         if !other_results.is_empty() {
             msg.push_str("<b>Найденные ссылки:</b>\n");
             for (i, result) in other_results.iter().enumerate() {
                 let shop = result.shop.as_deref().unwrap_or(&result.domain);
-                msg.push_str(&format!("{}. {}\n", i + 1, shop));
+                msg.push_str(&format!(
+                    "{}. <a href=\"{}\">{}</a>\n",
+                    i + 1,
+                    result.url,
+                    shop
+                ));
             }
         }
     } else {
@@ -972,10 +977,11 @@ fn format_web_search_results(response: &WebSearchResponse) -> String {
             let min_price = result.prices.iter().min().unwrap_or(&0);
 
             msg.push_str(&format!(
-                "{}. <b>{}</b>\n   💰 от {} ₽\n   🔗 {}\n\n",
+                "{}. <b>{}</b>\n   💰 от {} ₽\n   🔗 <a href=\"{}\">{}</a>\n\n",
                 i + 1,
                 shop,
                 min_price,
+                result.url,
                 result.domain
             ));
         }
