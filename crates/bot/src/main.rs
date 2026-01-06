@@ -80,27 +80,27 @@ struct WebSearchResult {
 
 /// Bot commands
 #[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "Supported commands:")]
+#[command(rename_rule = "lowercase", description = "Доступные команды:")]
 enum Command {
-    #[command(description = "Start the bot")]
+    #[command(description = "Запустить бота")]
     Start,
-    #[command(description = "Show this help message")]
+    #[command(description = "Показать справку")]
     Help,
-    #[command(description = "Search products: /search <query>")]
+    #[command(description = "Поиск товаров: /search <запрос>")]
     Search(String),
-    #[command(description = "Get prices: /price <product_id>")]
+    #[command(description = "Цены товара: /price <id>")]
     Price(String),
-    #[command(description = "Show trends: /trends <product_id> [days]")]
+    #[command(description = "Тренды цен: /trends <id> [дни]")]
     Trends(String),
-    #[command(description = "Predict price: /predict <product_id>")]
+    #[command(description = "Прогноз цены: /predict <id>")]
     Predict(String),
-    #[command(description = "Find arbitrage: /arbitrage [min_profit]")]
+    #[command(description = "Арбитраж: /arbitrage [мин_профит]")]
     Arbitrage(String),
-    #[command(description = "Compare stores: /compare <product_id>")]
+    #[command(description = "Сравнить магазины: /compare <id>")]
     Compare(String),
-    #[command(description = "Web search: /web <query>")]
+    #[command(description = "Веб-поиск: /web <запрос>")]
     Web(String),
-    #[command(description = "Top 100 products: /top [limit]")]
+    #[command(description = "Топ товаров: /top [лимит]")]
     Top(String),
 }
 
@@ -440,18 +440,18 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
             info!("Search command received - query length: {}, query: '{}'", query.len(), query);
 
             if query.trim().is_empty() {
-                bot.send_message(chat_id, "❌ Please provide a search query.\n\nExample: /search MacBook Pro 16")
+                bot.send_message(chat_id, "❌ Укажите поисковый запрос.\n\nПример: /search MacBook Pro 16")
                     .await?;
                 return Ok(());
             }
 
-            bot.send_message(chat_id, format!("🔍 Searching for: {}...", query))
+            bot.send_message(chat_id, format!("🔍 Ищу: {}...", query))
                 .await?;
 
             match db.search_products(&query).await {
                 Ok(products) => {
                     if products.is_empty() {
-                        bot.send_message(chat_id, format!("😕 No products found for: {}", query))
+                        bot.send_message(chat_id, format!("😕 Ничего не найдено по запросу: {}", query))
                             .await?;
                     } else {
                         let response = format_search_results(&products);
@@ -462,7 +462,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                 }
                 Err(e) => {
                     error!("Database error in search: {:#}", e);
-                    bot.send_message(chat_id, "❌ Search failed. Please try again.")
+                    bot.send_message(chat_id, "❌ Ошибка поиска. Попробуйте позже.")
                         .await?;
                 }
             }
@@ -471,7 +471,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         Command::Price(product_id_str) => {
             match product_id_str.trim().parse::<i64>() {
                 Ok(product_id) => {
-                    bot.send_message(chat_id, format!("💰 Getting prices for product {}...", product_id))
+                    bot.send_message(chat_id, format!("💰 Получаю цены для товара {}...", product_id))
                         .await?;
 
                     match db.get_product(product_id).await {
@@ -498,24 +498,24 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                                 }
                                 Err(e) => {
                                     error!("Database error getting prices: {:#}", e);
-                                    bot.send_message(chat_id, "❌ Failed to get prices. Please try again.")
+                                    bot.send_message(chat_id, "❌ Не удалось получить цены. Попробуйте позже.")
                                         .await?;
                                 }
                             }
                         }
                         Ok(None) => {
-                            bot.send_message(chat_id, "❌ Product not found.")
+                            bot.send_message(chat_id, "❌ Товар не найден.")
                                 .await?;
                         }
                         Err(e) => {
                             error!("Database error: {:#}", e);
-                            bot.send_message(chat_id, "❌ Failed to get product. Please try again.")
+                            bot.send_message(chat_id, "❌ Ошибка загрузки товара. Попробуйте позже.")
                                 .await?;
                         }
                     }
                 }
                 Err(_) => {
-                    bot.send_message(chat_id, "❌ Invalid product ID. Must be a number.\n\nExample: /price 1")
+                    bot.send_message(chat_id, "❌ Неверный ID товара. Укажите число.\n\nПример: /price 1")
                         .await?;
                 }
             }
@@ -524,7 +524,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         Command::Trends(args) => {
             let parts: Vec<&str> = args.split_whitespace().collect();
             if parts.is_empty() {
-                bot.send_message(chat_id, "❌ Please provide a product ID.\n\nExample: /trends 1 30")
+                bot.send_message(chat_id, "❌ Укажите ID товара.\n\nПример: /trends 1 30")
                     .await?;
                 return Ok(());
             }
@@ -535,13 +535,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                         .and_then(|s| s.parse::<i32>().ok())
                         .unwrap_or(7);
 
-                    bot.send_message(chat_id, format!("📈 Getting price trends for product {} ({} days)...", product_id, days))
+                    bot.send_message(chat_id, format!("📈 Загружаю тренды цен для товара {} ({} дней)...", product_id, days))
                         .await?;
 
                     match db.get_price_trends(product_id, days).await {
                         Ok(trends) => {
                             if trends.is_empty() {
-                                bot.send_message(chat_id, format!("😕 No price history found for product {}", product_id))
+                                bot.send_message(chat_id, format!("😕 История цен не найдена для товара {}", product_id))
                                     .await?;
                             } else {
                                 let response = format_price_trends(product_id, &trends);
@@ -552,13 +552,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                         }
                         Err(e) => {
                             error!("Database error getting trends: {:#}", e);
-                            bot.send_message(chat_id, "❌ Failed to get trends. Please try again.")
+                            bot.send_message(chat_id, "❌ Ошибка загрузки трендов. Попробуйте позже.")
                                 .await?;
                         }
                     }
                 }
                 Err(_) => {
-                    bot.send_message(chat_id, "❌ Invalid product ID. Must be a number.\n\nExample: /trends 1 30")
+                    bot.send_message(chat_id, "❌ Неверный ID товара. Укажите число.\n\nПример: /trends 1 30")
                         .await?;
                 }
             }
@@ -567,7 +567,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         Command::Predict(product_id_str) => {
             match product_id_str.trim().parse::<i64>() {
                 Ok(product_id) => {
-                    bot.send_message(chat_id, format!("🔮 Predicting price for product {}...", product_id))
+                    bot.send_message(chat_id, format!("🔮 Прогнозирую цену для товара {}...", product_id))
                         .await?;
 
                     match call_ml_predictor(product_id).await {
@@ -579,13 +579,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                         }
                         Err(e) => {
                             error!("ML prediction failed: {:#}", e);
-                            bot.send_message(chat_id, "❌ Prediction failed. ML model needs training first.")
+                            bot.send_message(chat_id, "❌ Ошибка прогноза. ML модель требует обучения.")
                                 .await?;
                         }
                     }
                 }
                 Err(_) => {
-                    bot.send_message(chat_id, "❌ Invalid product ID. Must be a number.\n\nExample: /predict 1")
+                    bot.send_message(chat_id, "❌ Неверный ID товара. Укажите число.\n\nПример: /predict 1")
                         .await?;
                 }
             }
@@ -596,13 +596,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                 .parse::<f64>()
                 .unwrap_or(10.0);
 
-            bot.send_message(chat_id, format!("💸 Finding arbitrage opportunities (min {}% profit)...", min_profit))
+            bot.send_message(chat_id, format!("💸 Ищу арбитражные возможности (мин. {}% профит)...", min_profit))
                 .await?;
 
             match db.find_arbitrage_opportunities(min_profit).await {
                 Ok(opportunities) => {
                     if opportunities.is_empty() {
-                        bot.send_message(chat_id, format!("😕 No arbitrage opportunities found with {}% min profit", min_profit))
+                        bot.send_message(chat_id, format!("😕 Арбитражные возможности с профитом {}% не найдены", min_profit))
                             .await?;
                     } else {
                         let response = format_arbitrage(&opportunities);
@@ -613,7 +613,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                 }
                 Err(e) => {
                     error!("Database error finding arbitrage: {:#}", e);
-                    bot.send_message(chat_id, "❌ Failed to find arbitrage. Please try again.")
+                    bot.send_message(chat_id, "❌ Ошибка поиска арбитража. Попробуйте позже.")
                         .await?;
                 }
             }
@@ -622,13 +622,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         Command::Compare(product_id_str) => {
             match product_id_str.trim().parse::<i64>() {
                 Ok(product_id) => {
-                    bot.send_message(chat_id, format!("🏪 Comparing stores for product {}...", product_id))
+                    bot.send_message(chat_id, format!("🏪 Сравниваю магазины для товара {}...", product_id))
                         .await?;
 
                     match db.get_store_comparison(product_id, 30).await {
                         Ok(stores) => {
                             if stores.is_empty() {
-                                bot.send_message(chat_id, format!("😕 No store data found for product {}", product_id))
+                                bot.send_message(chat_id, format!("😕 Данные о магазинах не найдены для товара {}", product_id))
                                     .await?;
                             } else {
                                 let response = format_store_comparison(product_id, &stores);
@@ -639,13 +639,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                         }
                         Err(e) => {
                             error!("Database error comparing stores: {:#}", e);
-                            bot.send_message(chat_id, "❌ Failed to compare stores. Please try again.")
+                            bot.send_message(chat_id, "❌ Ошибка сравнения магазинов. Попробуйте позже.")
                                 .await?;
                         }
                     }
                 }
                 Err(_) => {
-                    bot.send_message(chat_id, "❌ Invalid product ID. Must be a number.\n\nExample: /compare 1")
+                    bot.send_message(chat_id, "❌ Неверный ID товара. Укажите число.\n\nПример: /compare 1")
                         .await?;
                 }
             }
@@ -718,74 +718,74 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
 /// Generate compact command hints footer for all messages
 fn format_command_hints_footer() -> &'static str {
     "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
-     <b>Commands:</b>\n\
+     <b>Команды:</b>\n\
      /start /help /search /price /trends\n\
      /predict /arbitrage /compare /web /top"
 }
 
 fn format_start_message() -> String {
-    format!(r#"👋 <b>Welcome to Price Scout Bot!</b>
+    format!(r#"👋 <b>Добро пожаловать в Price Scout!</b>
 
-I help you track electronics prices across Russian marketplaces and find the best deals.
+Я помогаю отслеживать цены на электронику в российских магазинах и находить лучшие предложения.
 
-<b>What I can do:</b>
-🔍 Search products
-💰 Compare prices across stores
-📈 Show price trends and predictions
-💸 Find arbitrage opportunities
-🏪 Compare store ratings
+<b>Что я умею:</b>
+🔍 Искать товары
+💰 Сравнивать цены в магазинах
+📈 Показывать тренды и прогнозы цен
+💸 Находить арбитражные возможности
+🏪 Сравнивать рейтинги магазинов
 
-<b>Quick Start:</b>
-Try: /search MacBook Pro 16
+<b>Быстрый старт:</b>
+Попробуйте: /search MacBook Pro 16
 
-Use /help to see all commands.
+Или просто напишите название товара!
 
-<b>Powered by</b> Price Scout Analytics Platform
+<b>Powered by</b> Price Scout Analytics
 {}"#,
         format_command_hints_footer()
     )
 }
 
 fn format_help_message() -> String {
-    format!(r#"<b>Available Commands:</b>
+    format!(r#"<b>Доступные команды:</b>
 
-<b>Basic:</b>
-/search &lt;query&gt; - Search for products
-/price &lt;id&gt; - Get current prices
-/web &lt;query&gt; - Web search (DuckDuckGo)
+<b>Основные:</b>
+/search &lt;запрос&gt; - Поиск товаров
+/price &lt;id&gt; - Цены товара
+/web &lt;запрос&gt; - Веб-поиск (DuckDuckGo)
 
-<b>Analytics:</b>
-/trends &lt;id&gt; [days] - Price trends (default: 7 days)
-/predict &lt;id&gt; - ML price prediction (7 days ahead)
-/compare &lt;id&gt; - Compare stores by price/availability
-/arbitrage [profit%] - Find price differences (default: 10%)
-/top [limit] - Top popular products (default: 10)
+<b>Аналитика:</b>
+/trends &lt;id&gt; [дни] - Тренды цен (по умолчанию: 7 дней)
+/predict &lt;id&gt; - ML прогноз цены (на 7 дней)
+/compare &lt;id&gt; - Сравнение магазинов
+/arbitrage [профит%] - Арбитражные возможности (по умолчанию: 10%)
+/top [лимит] - Топ популярных товаров (по умолчанию: 10)
 
-<b>Smart Search:</b>
-Just type product name - bot will search DB and web!
+<b>Умный поиск:</b>
+Просто напишите название товара - бот найдёт в БД и интернете!
 
-<b>Examples:</b>
+<b>Примеры:</b>
 /search MacBook Pro 16
 /price 1
-/web рогатка centershot
+/web фонарь Fenix
 /trends 1 30
 /predict 1
 /top 20
 
-<b>Coming Soon:</b>
-/track &lt;id&gt; &lt;price&gt; - Set price alert
+<b>Скоро:</b>
+/track &lt;id&gt; &lt;цена&gt; - Отслеживание цены
 {}"#,
         format_command_hints_footer()
     )
 }
 
 fn format_search_results(products: &[Product]) -> String {
-    let mut response = format!("<b>🔍 Found {} products:</b>\n\n", products.len());
+    let mut response = format!("<b>🔍 Найдено товаров: {}</b>\n\n", products.len());
 
     for product in products.iter().take(10) {
-        let category = product.category.as_deref().unwrap_or("Unknown");
+        let category = product.category.as_deref().unwrap_or("Без категории");
         response.push_str(&format!(
-            "<b>ID {}:</b> {}\n<i>Category: {}</i>\n\n",
+            "<b>ID {}:</b> {}\n<i>Категория: {}</i>\n\n",
             product.id,
             product.name,
             category
@@ -793,10 +793,10 @@ fn format_search_results(products: &[Product]) -> String {
     }
 
     if products.len() > 10 {
-        response.push_str(&format!("\n<i>... and {} more results</i>\n", products.len() - 10));
+        response.push_str(&format!("\n<i>... и ещё {} результатов</i>\n", products.len() - 10));
     }
 
-    response.push_str("\n💡 <i>Use /price &lt;id&gt; to see prices</i>");
+    response.push_str("\n💡 <i>/price &lt;id&gt; - посмотреть цены</i>");
     response.push_str(format_command_hints_footer());
 
     response
@@ -804,12 +804,12 @@ fn format_search_results(products: &[Product]) -> String {
 
 fn format_price_data(product: &Product, price_data: &[(StorePrice, Store)]) -> String {
     let mut response = format!(
-        "<b>💰 Prices for: {}</b>\n\n",
+        "<b>💰 Цены на: {}</b>\n\n",
         product.name
     );
 
     if price_data.is_empty() {
-        response.push_str("😕 No prices found\n");
+        response.push_str("😕 Цены не найдены\n");
         return response;
     }
 
@@ -829,24 +829,24 @@ fn format_price_data(product: &Product, price_data: &[(StorePrice, Store)]) -> S
     if let Some((best_price, best_store)) = price_data.first() {
         let best_price_rub = best_price.price as f64 / 100.0;
         response.push_str(&format!(
-            "\n[+] <b>Best price:</b> {:.0} ₽ at {}\n",
+            "\n[+] <b>Лучшая цена:</b> {:.0} ₽ в {}\n",
             best_price_rub,
             best_store.name
         ));
     }
 
-    response.push_str(&format!("\n💡 <i>Use /trends {} to see price history</i>", product.id));
+    response.push_str(&format!("\n💡 <i>/trends {} - история цен</i>", product.id));
     response.push_str(format_command_hints_footer());
 
     response
 }
 
 fn format_price_trends(product_id: i64, trends: &[(chrono::NaiveDate, f64, i32, i32, Option<f64>)]) -> String {
-    let mut response = format!("<b>📈 Price Trends (Product ID: {})</b>\n\n", product_id);
+    let mut response = format!("<b>📈 Тренды цен (Товар ID: {})</b>\n\n", product_id);
 
     if trends.is_empty() {
-        response.push_str("😕 No trend data available yet.\n");
-        response.push_str("\n<i>Trends require historical data collection.</i>");
+        response.push_str("😕 Нет данных о трендах.\n");
+        response.push_str("\n<i>Тренды появятся после накопления данных.</i>");
         return response;
     }
 
@@ -856,7 +856,7 @@ fn format_price_trends(product_id: i64, trends: &[(chrono::NaiveDate, f64, i32, 
         let max_price = *max_kopecks as f64 / 100.0;
 
         response.push_str(&format!(
-            "<b>{}</b>: {:.0} ₽ (range: {:.0}-{:.0})\n",
+            "<b>{}</b>: {:.0} ₽ (диапазон: {:.0}-{:.0})\n",
             date,
             avg_price,
             min_price,
@@ -872,14 +872,14 @@ fn format_price_trends(product_id: i64, trends: &[(chrono::NaiveDate, f64, i32, 
             let trend_icon = if change > 0.0 { "[^]" } else if change < 0.0 { "[v]" } else { "[-]" };
 
             response.push_str(&format!(
-                "{} <i>{:+.1}% vs yesterday</i>\n",
+                "{} <i>{:+.1}% за день</i>\n",
                 trend_icon,
                 change_pct
             ));
         }
     }
 
-    response.push_str(&format!("\n💡 <i>Use /predict {} for ML forecast</i>", product_id));
+    response.push_str(&format!("\n💡 <i>/predict {} - ML прогноз</i>", product_id));
     response.push_str(format_command_hints_footer());
 
     response
@@ -899,6 +899,11 @@ fn format_price_prediction(pred: &PricePredictionResponse) -> String {
     };
 
     let trend_icon = if change > 0.0 { "[^]" } else if change < 0.0 { "[v]" } else { "[-]" };
+    let confidence_ru = match pred.confidence.as_str() {
+        "high" => "высокая",
+        "medium" => "средняя",
+        _ => "низкая",
+    };
     let confidence_icon = match pred.confidence.as_str() {
         "high" => "[+++]",
         "medium" => "[++]",
@@ -906,24 +911,24 @@ fn format_price_prediction(pred: &PricePredictionResponse) -> String {
     };
 
     format!(
-        r#"<b>[P] Price Prediction (Product ID: {})</b>
+        r#"<b>🔮 Прогноз цены (Товар ID: {})</b>
 
-<b>Current Price:</b> {:.0} ₽
-<b>Predicted (7 days):</b> {:.0} ₽
+<b>Текущая цена:</b> {:.0} ₽
+<b>Прогноз (7 дней):</b> {:.0} ₽
 
-{} <b>Change:</b> {:+.0} ₽ ({:+.1}%)
-{} <b>Confidence:</b> {}
+{} <b>Изменение:</b> {:+.0} ₽ ({:+.1}%)
+{} <b>Уверенность:</b> {}
 
-<b>Price Range:</b>
-  Low: {:.0} ₽
-  High: {:.0} ₽
+<b>Диапазон цен:</b>
+  Мин: {:.0} ₽
+  Макс: {:.0} ₽
 
-<b>Model Accuracy:</b>
+<b>Точность модели:</b>
   R² Score: {:.3}
   MAE: {:.0} ₽
 
-<i>Prediction made: {}</i>
-<i>Model trained: {}</i>
+<i>Прогноз сделан: {}</i>
+<i>Модель обучена: {}</i>
 {}"#,
         pred.product_id,
         current,
@@ -932,7 +937,7 @@ fn format_price_prediction(pred: &PricePredictionResponse) -> String {
         change,
         change_pct,
         confidence_icon,
-        pred.confidence,
+        confidence_ru,
         lower,
         upper,
         pred.model_accuracy.r2_score,
@@ -945,15 +950,15 @@ fn format_price_prediction(pred: &PricePredictionResponse) -> String {
 
 #[allow(clippy::type_complexity)]
 fn format_arbitrage(opportunities: &[(i64, String, String, i64, String, i32, i64, String, i32, i32, f64)]) -> String {
-    let mut response = "<b>💸 Arbitrage Opportunities</b>\n\n".to_string();
+    let mut response = "<b>💸 Арбитражные возможности</b>\n\n".to_string();
 
     if opportunities.is_empty() {
-        response.push_str("😕 No arbitrage opportunities found.\n");
-        response.push_str("\n<i>Try lowering the profit threshold: /arbitrage 5</i>");
+        response.push_str("😕 Арбитражные возможности не найдены.\n");
+        response.push_str("\n<i>Попробуйте снизить порог: /arbitrage 5</i>");
         return response;
     }
 
-    response.push_str(&format!("<b>Found {} opportunities:</b>\n\n", opportunities.len()));
+    response.push_str(&format!("<b>Найдено {} возможностей:</b>\n\n", opportunities.len()));
 
     for (i, opp) in opportunities.iter().take(5).enumerate() {
         let (_product_id, name, _category, _buy_store_id, buy_store_name, buy_price_kopecks,
@@ -969,24 +974,24 @@ fn format_arbitrage(opportunities: &[(i64, String, String, i64, String, i32, i64
             name
         ));
         response.push_str(&format!(
-            "[<] Buy at <b>{}</b>: {:.0} ₽\n",
+            "[<] Купить в <b>{}</b>: {:.0} ₽\n",
             buy_store_name,
             buy_price
         ));
         response.push_str(&format!(
-            "[>] Sell at <b>{}</b>: {:.0} ₽\n",
+            "[>] Продать в <b>{}</b>: {:.0} ₽\n",
             sell_store_name,
             sell_price
         ));
         response.push_str(&format!(
-            "[$$] <b>Profit:</b> {:.0} ₽ ({:.1}%)\n\n",
+            "[$$] <b>Профит:</b> {:.0} ₽ ({:.1}%)\n\n",
             profit,
             profit_percent
         ));
     }
 
     if opportunities.len() > 5 {
-        response.push_str(&format!("\n<i>... and {} more opportunities</i>", opportunities.len() - 5));
+        response.push_str(&format!("\n<i>... и ещё {} возможностей</i>", opportunities.len() - 5));
     }
 
     response.push_str(format_command_hints_footer());
@@ -994,10 +999,10 @@ fn format_arbitrage(opportunities: &[(i64, String, String, i64, String, i32, i64
 }
 
 fn format_store_comparison(product_id: i64, stores: &[(String, f64, i64, f64)]) -> String {
-    let mut response = format!("<b>🏪 Store Comparison (Product ID: {})</b>\n\n", product_id);
+    let mut response = format!("<b>🏪 Сравнение магазинов (Товар ID: {})</b>\n\n", product_id);
 
     if stores.is_empty() {
-        response.push_str("😕 No store data available.\n");
+        response.push_str("😕 Нет данных о магазинах.\n");
         return response;
     }
 
@@ -1011,15 +1016,15 @@ fn format_store_comparison(product_id: i64, stores: &[(String, f64, i64, f64)]) 
             store_name
         ));
         response.push_str(&format!(
-            "   [$] Avg: {:.0} ₽ | [#] Updates: {} | [+] Available: {}%\n\n",
+            "   [$] Сред: {:.0} ₽ | [#] Обновлений: {} | [+] Наличие: {}%\n\n",
             avg_price,
             update_count,
             availability
         ));
     }
 
-    response.push_str("\n💡 <i>Lower average = better price</i>");
-    response.push_str("\n💡 <i>Higher availability = more reliable</i>");
+    response.push_str("\n💡 <i>Ниже средняя = лучше цена</i>");
+    response.push_str("\n💡 <i>Выше наличие = надёжнее</i>");
     response.push_str(format_command_hints_footer());
 
     response
