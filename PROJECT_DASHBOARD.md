@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-06 (PS-39 Market Research System Complete)
+> Последнее обновление: 2026-01-06 (PS-30 Bot Notifications + Project Cleanup)
 
 ---
 
@@ -31,6 +31,7 @@
 
 | ID    | Задача                                 | Дата       | Результат                         |
 |-------|----------------------------------------|------------|-----------------------------------|
+| PS-30 | Bot Notifications + Command Hints      | 2026-01-06 | Auto-notifications, footer hints  |
 | PS-39 | Market Research System                 | 2026-01-06 | Top 100, discovery, /top command  |
 | PS-8  | Telegram Bot (teloxide)                | 2026-01-06 | 10 commands, standalone DB mode   |
 | PS-38 | ML Price Predictions (Random Forest)   | 2026-01-05 | 7-day forecasts, Python ML script |
@@ -111,7 +112,7 @@
 | Задач в Backlog   | 4                |
 | Задач In Progress | 0                |
 | Задач в Review    | 2                |
-| Задач Done        | 25               |
+| Задач Done        | 26               |
 | Python скриптов   | 25               |
 | Rust modules      | 10               |
 | Bot commands      | 10               |
@@ -219,6 +220,8 @@
 
 | Дата       | Изменение                                                         |
 |------------|-------------------------------------------------------------------|
+| 2026-01-06 | PS-30: Bot Notifications - auto-analytics, command footer hints   |
+| 2026-01-06 | Project cleanup: reports moved to docs/reports/, debug files del  |
 | 2026-01-06 | PS-39: Market Research - Top 100, discovery, /top, /web commands  |
 | 2026-01-06 | PS-8: Telegram Bot - teloxide, 10 commands, standalone mode       |
 | 2026-01-05 | PS-38: ML Price Predictions - Random Forest 7-day forecasts       |
@@ -261,6 +264,61 @@
 ---
 
 ## Описание задач
+
+### PS-30: Bot Notifications + Command Hints
+
+**Статус:** Complete (2026-01-06)
+
+**Цель:** Добавить автоматические уведомления об аналитике после scraping и подсказки команд во все сообщения бота.
+
+**Реализовано:**
+
+| Компонент              | Описание                                    |
+|------------------------|---------------------------------------------|
+| NotificationService    | Сервис отправки уведомлений                 |
+| notification_poller    | Background task, polling каждые 5 мин       |
+| Command hints footer   | Footer со всеми 10 командами в сообщениях   |
+| chat_id tracking       | Сохранение chat_id при /start               |
+| Batch tracking         | Статистика scraping batch-ов                |
+
+**Новые таблицы БД (migration 005):**
+- `scraping_batches` - Статистика batch-ов (total, success, failed, price_changes)
+- `notification_log` - История отправленных уведомлений
+- `price_change_events` - События изменения цен
+- `users.chat_id` - ID чата для уведомлений
+- `users.notifications_enabled` - Флаг включения уведомлений
+
+**Формат уведомления:**
+```
+[!] Price Scout Analytics Update
+
+Summary:
+[+] Updated: 45 products
+[X] Failed: 3 products
+
+Price Changes (5):
+1. [v] MacBook Pro 16: -2.3%
+2. [^] iPhone 15 Pro: +1.5%
+...
+
+[$$] Arbitrage: 3 opportunities found!
+Use /arbitrage to see details
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Commands:
+/start /help /search /price /trends
+/predict /arbitrage /compare /web /top
+```
+
+**Файлы:**
+- migrations/005_bot_notifications.sql
+- crates/bot/src/notifications.rs [NEW]
+- crates/bot/src/main.rs (footer, /start, poller)
+- crates/models/src/lib.rs (ScrapingBatch, PriceChangeEvent)
+- crates/db/src/lib.rs (notification methods)
+- crates/scraper/src/worker.rs (batch tracking)
+
+---
 
 ### PS-39: Market Research System
 
