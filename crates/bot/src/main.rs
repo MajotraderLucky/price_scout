@@ -18,11 +18,12 @@
 //! - /trends <product_id> - Show price trends (7 days)
 //! - /predict <product_id> - Get ML price prediction
 //! - /arbitrage - Find arbitrage opportunities
+//! - /top [limit] - Show top popular products
 //! - /track <product_id> <target_price> - Track product (future)
 
 use anyhow::{Context, Result};
 use price_scout_db::Database;
-use price_scout_models::{Product, StorePrice, Store};
+use price_scout_models::{Product, ProductPopularity, StorePrice, Store};
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::{Dispatcher, UpdateFilterExt},
@@ -97,6 +98,8 @@ enum Command {
     Compare(String),
     #[command(description = "Web search: /web <query>")]
     Web(String),
+    #[command(description = "Top 100 products: /top [limit]")]
+    Top(String),
 }
 
 #[tokio::main]
@@ -490,7 +493,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         }
 
         Command::Trends(args) => {
-            let parts: Vec<&str> = args.trim().split_whitespace().collect();
+            let parts: Vec<&str> = args.split_whitespace().collect();
             if parts.is_empty() {
                 bot.send_message(chat_id, "❌ Please provide a product ID.\n\nExample: /trends 1 30")
                     .await?;
@@ -643,6 +646,39 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                 }
             }
         }
+
+        Command::Top(limit_str) => {
+            let limit = limit_str.trim()
+                .parse::<i32>()
+                .unwrap_or(10)
+                .min(100);
+
+            bot.send_message(chat_id, format!("📊 Загружаю Top {} товаров...", limit))
+                .await?;
+
+            match db.get_top_products(limit).await {
+                Ok(products) => {
+                    if products.is_empty() {
+                        bot.send_message(
+                            chat_id,
+                            "😕 Рейтинг товаров пока не сформирован.\n\n<i>Данные появятся после накопления статистики.</i>"
+                        )
+                        .parse_mode(ParseMode::Html)
+                        .await?;
+                    } else {
+                        let response = format_top_products(&products);
+                        bot.send_message(chat_id, response)
+                            .parse_mode(ParseMode::Html)
+                            .await?;
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to get top products: {:#}", e);
+                    bot.send_message(chat_id, "❌ Ошибка загрузки рейтинга. Попробуйте позже.")
+                        .await?;
+                }
+            }
+        }
     }
 
     Ok(())
@@ -684,6 +720,7 @@ fn format_help_message() -> String {
 /predict &lt;id&gt; - ML price prediction (7 days ahead)
 /compare &lt;id&gt; - Compare stores by price/availability
 /arbitrage [profit%] - Find price differences (default: 10%)
+/top [limit] - Top popular products (default: 10)
 
 <b>Smart Search:</b>
 Just type product name - bot will search DB and web!
@@ -694,6 +731,7 @@ Just type product name - bot will search DB and web!
 /web рогатка centershot
 /trends 1 30
 /predict 1
+/top 20
 
 <b>Coming Soon:</b>
 /track &lt;id&gt; &lt;price&gt; - Set price alert
@@ -860,8 +898,9 @@ fn format_price_prediction(pred: &PricePredictionResponse) -> String {
     )
 }
 
+#[allow(clippy::type_complexity)]
 fn format_arbitrage(opportunities: &[(i64, String, String, i64, String, i32, i64, String, i32, i32, f64)]) -> String {
-    let mut response = format!("<b>💸 Arbitrage Opportunities</b>\n\n");
+    let mut response = "<b>💸 Arbitrage Opportunities</b>\n\n".to_string();
 
     if opportunities.is_empty() {
         response.push_str("😕 No arbitrage opportunities found.\n");
@@ -992,4 +1031,68 @@ fn format_web_search_results(response: &WebSearchResponse) -> String {
     }
 
     msg
+}
+
+fn format_top_products(products: &[ProductPopularity]) -> String {
+    let mut msg = format!("<b>📊 Top {} популярных товаров</b>\n", products.len());
+    msg.push_str("<i>(диапазон 1,000 - 15,000 ₽)</i>\n\n");
+
+    for (i, p) in products.iter().take(10).enumerate() {
+        let score = p.popularity_score();
+        let category = p.category.as_deref().unwrap_or("—");
+
+        // Price range
+        let price_range = match (p.min_price, p.max_price) {
+            (Some(min), Some(max)) => format!("{} - {} ₽", min / 100, max / 100),
+            (Some(min), None) => format!("от {} ₽", min / 100),
+            _ => "—".to_string(),
+        };
+
+        // Score breakdown
+        let stores = p.store_count.unwrap_or(0);
+
+        msg.push_str(&format!(
+            "<b>{}. {}</b>\n",
+            i + 1,
+            truncate_name(&p.name, 40)
+        ));
+        msg.push_str(&format!(
+            "   📈 Рейтинг: <b>{}</b>/100 | 🏪 {}\n",
+            score,
+            stores
+        ));
+        msg.push_str(&format!(
+            "   💰 {} | 📁 {}\n",
+            price_range,
+            category
+        ));
+        msg.push_str(&format!(
+            "   <i>T:{} V:{} A:{} R:{}</i>\n\n",
+            p.tracking_score,
+            p.volatility_score,
+            p.availability_score,
+            p.arbitrage_score
+        ));
+    }
+
+    if products.len() > 10 {
+        msg.push_str(&format!("<i>... и ещё {} товаров</i>\n\n", products.len() - 10));
+    }
+
+    msg.push_str("<b>Расшифровка баллов:</b>\n");
+    msg.push_str("T=отслеживания, V=волатильность,\n");
+    msg.push_str("A=наличие, R=арбитраж\n\n");
+    msg.push_str("💡 <i>/price &lt;id&gt; для просмотра цен</i>");
+
+    msg
+}
+
+/// Truncate product name to fit in message
+fn truncate_name(name: &str, max_len: usize) -> String {
+    if name.chars().count() <= max_len {
+        name.to_string()
+    } else {
+        let truncated: String = name.chars().take(max_len - 3).collect();
+        format!("{}...", truncated)
+    }
 }

@@ -158,8 +158,7 @@ impl Database {
             // Extract text after "Артикул:" or "Артикул"
             query.split("Артикул")
                 .nth(1)
-                .map(|s| s.trim_start_matches(':').trim().split_whitespace().next())
-                .flatten()
+                .and_then(|s| s.trim_start_matches(':').split_whitespace().next())
                 .map(|s| s.to_string())
         } else {
             None
@@ -183,7 +182,7 @@ impl Database {
         )
         .bind(&name_pattern)
         .bind(article.as_ref().map(|a| format!("%{}%", a)).unwrap_or_else(|| name_pattern.clone()))
-        .bind(article.as_ref().map(|a| a.as_str()).unwrap_or(""))
+        .bind(article.as_deref().unwrap_or(""))
         .fetch_all(&self.pool)
         .await
         .context("Failed to search products")?;
@@ -821,5 +820,335 @@ impl Database {
         .context("Failed to find arbitrage opportunities")?;
 
         Ok(opportunities)
+    }
+
+    // ========================================================================
+    // MARKET RESEARCH
+    // ========================================================================
+
+    /// Record or update a search query for market research
+    ///
+    /// Uses upsert to increment search_count if query already exists.
+    ///
+    /// # Arguments
+    /// * `query` - The search query text
+    /// * `source` - Source of query ('telegram_bot', 'web_discovery', 'catalog_parse', 'manual')
+    /// * `category` - Optional category classification
+    ///
+    /// # Returns
+    /// ID of the search query record
+    pub async fn record_search_query(
+        &self,
+        query: &str,
+        source: &str,
+        category: Option<&str>,
+    ) -> Result<i64> {
+        let id = sqlx::query_scalar::<_, i64>(
+            r#"
+            INSERT INTO search_queries (query, source, category, search_count, last_searched_at)
+            VALUES ($1, $2, $3, 1, NOW())
+            ON CONFLICT (LOWER(query), source)
+            DO UPDATE SET
+                search_count = search_queries.search_count + 1,
+                last_searched_at = NOW(),
+                category = COALESCE(EXCLUDED.category, search_queries.category)
+            RETURNING id
+            "#,
+        )
+        .bind(query)
+        .bind(source)
+        .bind(category)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to record search query")?;
+
+        Ok(id)
+    }
+
+    /// Get most popular search queries
+    ///
+    /// Returns queries ordered by search count and recency.
+    ///
+    /// # Arguments
+    /// * `limit` - Maximum number of queries to return
+    ///
+    /// # Returns
+    /// Vector of SearchQuery objects
+    pub async fn get_popular_search_queries(&self, limit: i32) -> Result<Vec<SearchQuery>> {
+        let queries = sqlx::query_as::<_, SearchQuery>(
+            r#"
+            SELECT id, query, source, category, search_count, last_searched_at, created_at
+            FROM search_queries
+            ORDER BY search_count DESC, last_searched_at DESC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch popular search queries")?;
+
+        Ok(queries)
+    }
+
+    /// Get search queries by category
+    ///
+    /// # Arguments
+    /// * `category` - Category to filter by
+    /// * `limit` - Maximum number of queries to return
+    ///
+    /// # Returns
+    /// Vector of SearchQuery objects in the specified category
+    pub async fn get_search_queries_by_category(
+        &self,
+        category: &str,
+        limit: i32,
+    ) -> Result<Vec<SearchQuery>> {
+        let queries = sqlx::query_as::<_, SearchQuery>(
+            r#"
+            SELECT id, query, source, category, search_count, last_searched_at, created_at
+            FROM search_queries
+            WHERE category = $1
+            ORDER BY search_count DESC, last_searched_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(category)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch search queries by category")?;
+
+        Ok(queries)
+    }
+
+    /// Create a discovery job
+    ///
+    /// # Arguments
+    /// * `source` - Discovery source ('duckduckgo', 'ozon_catalog', 'dns_catalog', 'yandex_market_catalog')
+    /// * `category` - Optional category to search
+    /// * `query` - Optional search query
+    ///
+    /// # Returns
+    /// ID of the created discovery job
+    pub async fn create_discovery_job(
+        &self,
+        source: &str,
+        category: Option<&str>,
+        query: Option<&str>,
+    ) -> Result<i64> {
+        let id = sqlx::query_scalar::<_, i64>(
+            r#"
+            INSERT INTO discovery_jobs (source, category, query, status, scheduled_at)
+            VALUES ($1, $2, $3, 'pending', NOW())
+            RETURNING id
+            "#,
+        )
+        .bind(source)
+        .bind(category)
+        .bind(query)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to create discovery job")?;
+
+        Ok(id)
+    }
+
+    /// Get pending discovery jobs
+    ///
+    /// # Arguments
+    /// * `limit` - Maximum number of jobs to return
+    ///
+    /// # Returns
+    /// Vector of pending DiscoveryJob objects
+    pub async fn get_pending_discovery_jobs(&self, limit: i32) -> Result<Vec<DiscoveryJob>> {
+        let jobs = sqlx::query_as::<_, DiscoveryJob>(
+            r#"
+            SELECT id, source, category, query, status, products_found, products_new,
+                   scheduled_at, started_at, completed_at, error
+            FROM discovery_jobs
+            WHERE status = 'pending'
+            ORDER BY scheduled_at ASC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch pending discovery jobs")?;
+
+        Ok(jobs)
+    }
+
+    /// Update discovery job status
+    ///
+    /// # Arguments
+    /// * `job_id` - ID of the job to update
+    /// * `status` - New status ('running', 'completed', 'failed')
+    /// * `products_found` - Number of products found (optional)
+    /// * `products_new` - Number of new products added (optional)
+    /// * `error` - Error message if failed (optional)
+    pub async fn update_discovery_job_status(
+        &self,
+        job_id: i64,
+        status: &str,
+        products_found: Option<i32>,
+        products_new: Option<i32>,
+        error: Option<&str>,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE discovery_jobs
+            SET status = $2,
+                products_found = COALESCE($3, products_found),
+                products_new = COALESCE($4, products_new),
+                error = $5,
+                started_at = CASE WHEN $2 = 'running' THEN NOW() ELSE started_at END,
+                completed_at = CASE WHEN $2 IN ('completed', 'failed') THEN NOW() ELSE NULL END
+            WHERE id = $1
+            "#,
+        )
+        .bind(job_id)
+        .bind(status)
+        .bind(products_found)
+        .bind(products_new)
+        .bind(error)
+        .execute(&self.pool)
+        .await
+        .context("Failed to update discovery job status")?;
+
+        Ok(())
+    }
+
+    /// Get top products by popularity score
+    ///
+    /// Returns products from the materialized view, ordered by combined popularity score.
+    ///
+    /// # Arguments
+    /// * `limit` - Maximum number of products to return (max 100)
+    ///
+    /// # Returns
+    /// Vector of ProductPopularity objects
+    pub async fn get_top_products(&self, limit: i32) -> Result<Vec<ProductPopularity>> {
+        let limit = limit.min(100);
+        let products = sqlx::query_as::<_, ProductPopularity>(
+            r#"
+            SELECT
+                product_id,
+                name,
+                category,
+                tracking_score,
+                volatility_score,
+                availability_score,
+                arbitrage_score,
+                tracking_count,
+                min_price,
+                max_price,
+                store_count,
+                calculated_at
+            FROM mv_product_popularity
+            ORDER BY (tracking_score + volatility_score + availability_score + arbitrage_score) DESC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch top products")?;
+
+        Ok(products)
+    }
+
+    /// Get popularity metrics for a specific product
+    ///
+    /// # Arguments
+    /// * `product_id` - Product ID to look up
+    ///
+    /// # Returns
+    /// ProductPopularity if found, None otherwise
+    pub async fn get_product_popularity(&self, product_id: i64) -> Result<Option<ProductPopularity>> {
+        let popularity = sqlx::query_as::<_, ProductPopularity>(
+            r#"
+            SELECT
+                product_id,
+                name,
+                category,
+                tracking_score,
+                volatility_score,
+                availability_score,
+                arbitrage_score,
+                tracking_count,
+                min_price,
+                max_price,
+                store_count,
+                calculated_at
+            FROM mv_product_popularity
+            WHERE product_id = $1
+            "#,
+        )
+        .bind(product_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to fetch product popularity")?;
+
+        Ok(popularity)
+    }
+
+    /// Refresh the product popularity materialized view
+    ///
+    /// This should be called hourly by the discovery scheduler.
+    pub async fn refresh_popularity_metrics(&self) -> Result<()> {
+        sqlx::query("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_product_popularity")
+            .execute(&self.pool)
+            .await
+            .context("Failed to refresh popularity metrics")?;
+
+        Ok(())
+    }
+
+    /// Get distinct product categories
+    ///
+    /// # Returns
+    /// Vector of category names
+    pub async fn get_product_categories(&self) -> Result<Vec<String>> {
+        let categories = sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT DISTINCT category
+            FROM products
+            WHERE category IS NOT NULL
+            ORDER BY category
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch product categories")?;
+
+        Ok(categories)
+    }
+
+    /// Get products by category
+    ///
+    /// # Arguments
+    /// * `category` - Category to filter by
+    /// * `limit` - Maximum number of products to return
+    ///
+    /// # Returns
+    /// Vector of Product objects in the specified category
+    pub async fn get_products_by_category(&self, category: &str, limit: i32) -> Result<Vec<Product>> {
+        let products = sqlx::query_as::<_, Product>(
+            r#"
+            SELECT * FROM products
+            WHERE category = $1
+            ORDER BY updated_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(category)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch products by category")?;
+
+        Ok(products)
     }
 }

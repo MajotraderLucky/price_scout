@@ -11,6 +11,8 @@ This directory contains systemd service and timer files for automated deployment
 | price-scout-worker.service        | Background worker (continuous processing)        |
 | price-scout-scheduler.service     | Scheduler (one-shot job enqueuing)               |
 | price-scout-scheduler.timer       | Timer for scheduler (every 10 minutes)           |
+| price-scout-discovery.service     | Discovery engine (product discovery + metrics)   |
+| price-scout-discovery.timer       | Timer for discovery (hourly)                     |
 | stores.json                       | Store configuration (legacy, use PostgreSQL)     |
 
 ### Deployment Options
@@ -58,6 +60,51 @@ sudo systemctl list-timers | grep price-scout
 
 # View logs
 sudo journalctl -u price-scout-scheduler -f
+```
+
+#### Option 3: Discovery Engine (Market Research)
+
+The discovery engine runs hourly to:
+1. Create discovery jobs from popular user search queries
+2. Process pending discovery jobs (DuckDuckGo search)
+3. Refresh product popularity metrics (materialized view)
+
+```bash
+# Copy service and timer files
+sudo cp config/price-scout-discovery.service /etc/systemd/system/
+sudo cp config/price-scout-discovery.timer /etc/systemd/system/
+
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Enable and start timer
+sudo systemctl enable price-scout-discovery.timer
+sudo systemctl start price-scout-discovery.timer
+
+# Check timer status
+sudo systemctl list-timers | grep price-scout
+
+# Run manually once
+sudo systemctl start price-scout-discovery
+
+# View logs
+sudo journalctl -u price-scout-discovery -f
+```
+
+**User mode (local development):**
+```bash
+# Copy to user systemd directory
+mkdir -p ~/.config/systemd/user/
+cp config/price-scout-discovery-user.service ~/.config/systemd/user/
+cp config/price-scout-discovery-user.timer ~/.config/systemd/user/
+
+# Reload and enable
+systemctl --user daemon-reload
+systemctl --user enable price-scout-discovery-user.timer
+systemctl --user start price-scout-discovery-user.timer
+
+# Check timer
+systemctl --user list-timers | grep discovery
 ```
 
 ### Configuration

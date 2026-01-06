@@ -345,8 +345,7 @@ impl ScraperWorker {
             "FAIL" | "ERROR" => {
                 let error_msg = response
                     .error
-                    .as_ref()
-                    .map(|s| s.as_str())
+                    .as_deref()
                     .unwrap_or("Unknown error");
                 warn!(
                     "Job {}: Scraper failed for store {}: {}",

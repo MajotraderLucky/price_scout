@@ -21,6 +21,12 @@
 //! - `GET /api/arbitrage?min_profit=10` - Find arbitrage opportunities (price differences across stores)
 //! - `GET /api/analytics/predictions/:id` - Get ML-based price prediction for product (7-day forecast)
 //!
+//! ### Market Research Endpoints
+//! - `GET /api/market-research/top-100?limit=100` - Get top 100 popular products by score
+//! - `GET /api/market-research/popular-queries?limit=50` - Get popular search queries
+//! - `GET /api/market-research/categories` - Get list of product categories
+//! - `POST /api/market-research/refresh` - Refresh popularity metrics (materialized view)
+//!
 //! ## Usage
 //!
 //! ```bash
@@ -217,6 +223,79 @@ struct ModelAccuracy {
     mae_rub: f64,
 }
 
+// ============================================================================
+// MARKET RESEARCH TYPES
+// ============================================================================
+
+/// Query parameters for top products endpoint
+#[derive(Debug, Deserialize)]
+struct TopProductsQuery {
+    #[serde(default = "default_top_limit")]
+    limit: i32,
+}
+
+/// Query parameters for popular queries endpoint
+#[derive(Debug, Deserialize)]
+struct PopularQueriesQuery {
+    #[serde(default = "default_queries_limit")]
+    limit: i32,
+}
+
+/// Top product entry with rank
+#[derive(Debug, Serialize)]
+struct TopProductEntry {
+    rank: i32,
+    product_id: i64,
+    name: String,
+    category: Option<String>,
+    popularity_score: i32,
+    tracking_score: i32,
+    volatility_score: i32,
+    availability_score: i32,
+    arbitrage_score: i32,
+    tracking_count: i64,
+    min_price_rub: Option<i32>,
+    max_price_rub: Option<i32>,
+    store_count: i64,
+}
+
+/// Top products response
+#[derive(Debug, Serialize)]
+struct TopProductsResponse {
+    products: Vec<TopProductEntry>,
+    count: usize,
+}
+
+/// Popular queries response
+#[derive(Debug, Serialize)]
+struct PopularQueriesResponse {
+    queries: Vec<PopularQueryEntry>,
+    count: usize,
+}
+
+/// Popular query entry
+#[derive(Debug, Serialize)]
+struct PopularQueryEntry {
+    query: String,
+    source: String,
+    category: Option<String>,
+    search_count: i32,
+}
+
+/// Categories response
+#[derive(Debug, Serialize)]
+struct CategoriesResponse {
+    categories: Vec<String>,
+    count: usize,
+}
+
+/// Refresh metrics response
+#[derive(Debug, Serialize)]
+struct RefreshMetricsResponse {
+    status: String,
+    message: String,
+}
+
 /// Price prediction response
 #[derive(Debug, Serialize, Deserialize)]
 struct PricePredictionResponse {
@@ -247,6 +326,14 @@ fn default_correlation_days() -> i32 {
 
 fn default_currency() -> String {
     "USD".to_string()
+}
+
+fn default_top_limit() -> i32 {
+    100
+}
+
+fn default_queries_limit() -> i32 {
+    50
 }
 
 /// Custom error type for API handlers
@@ -314,6 +401,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/analytics/market-overview", get(get_market_overview))
         .route("/api/arbitrage", get(get_arbitrage_opportunities))
         .route("/api/analytics/predictions/:id", get(get_price_prediction))
+        // Market Research endpoints
+        .route("/api/market-research/top-100", get(get_top_products))
+        .route("/api/market-research/popular-queries", get(get_popular_queries))
+        .route("/api/market-research/categories", get(get_categories))
+        .route("/api/market-research/refresh", post(refresh_popularity_metrics))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
 
@@ -337,6 +429,10 @@ async fn main() -> anyhow::Result<()> {
     info!("   GET  /api/analytics/market-overview");
     info!("   GET  /api/arbitrage");
     info!("   GET  /api/analytics/predictions/:id");
+    info!("   GET  /api/market-research/top-100");
+    info!("   GET  /api/market-research/popular-queries");
+    info!("   GET  /api/market-research/categories");
+    info!("   POST /api/market-research/refresh");
 
     axum::serve(listener, app)
         .await
@@ -606,4 +702,89 @@ async fn get_price_prediction(
         .context("Failed to parse ML predictor output")?;
 
     Ok(Json(prediction))
+}
+
+// ============================================================================
+// MARKET RESEARCH HANDLERS
+// ============================================================================
+
+async fn get_top_products(
+    State(state): State<AppState>,
+    Query(query): Query<TopProductsQuery>,
+) -> Result<Json<TopProductsResponse>, ApiError> {
+    let products = state.db.get_top_products(query.limit).await?;
+
+    let entries: Vec<TopProductEntry> = products
+        .into_iter()
+        .enumerate()
+        .map(|(idx, p)| {
+            let popularity_score = p.popularity_score();
+            TopProductEntry {
+                rank: (idx + 1) as i32,
+                product_id: p.product_id,
+                name: p.name,
+                category: p.category,
+                popularity_score,
+                tracking_score: p.tracking_score,
+                volatility_score: p.volatility_score,
+                availability_score: p.availability_score,
+                arbitrage_score: p.arbitrage_score,
+                tracking_count: p.tracking_count,
+                min_price_rub: p.min_price.map(|p| p / 100),
+                max_price_rub: p.max_price.map(|p| p / 100),
+                store_count: p.store_count.unwrap_or(0),
+            }
+        })
+        .collect();
+
+    let count = entries.len();
+
+    Ok(Json(TopProductsResponse {
+        products: entries,
+        count,
+    }))
+}
+
+async fn get_popular_queries(
+    State(state): State<AppState>,
+    Query(query): Query<PopularQueriesQuery>,
+) -> Result<Json<PopularQueriesResponse>, ApiError> {
+    let queries = state.db.get_popular_search_queries(query.limit).await?;
+
+    let entries: Vec<PopularQueryEntry> = queries
+        .into_iter()
+        .map(|q| PopularQueryEntry {
+            query: q.query,
+            source: q.source,
+            category: q.category,
+            search_count: q.search_count,
+        })
+        .collect();
+
+    let count = entries.len();
+
+    Ok(Json(PopularQueriesResponse {
+        queries: entries,
+        count,
+    }))
+}
+
+async fn get_categories(
+    State(state): State<AppState>,
+) -> Result<Json<CategoriesResponse>, ApiError> {
+    let categories = state.db.get_product_categories().await?;
+    let count = categories.len();
+
+    Ok(Json(CategoriesResponse { categories, count }))
+}
+
+async fn refresh_popularity_metrics(
+    State(state): State<AppState>,
+) -> Result<Json<RefreshMetricsResponse>, ApiError> {
+    state.db.refresh_popularity_metrics().await?;
+
+    Ok(Json(RefreshMetricsResponse {
+        status: "success".to_string(),
+        message: "Popularity metrics refreshed successfully".to_string(),
+    }))
 }

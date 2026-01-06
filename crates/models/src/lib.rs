@@ -218,6 +218,126 @@ pub struct ScraperResponse {
 }
 
 // ============================================================================
+// MARKET RESEARCH MODELS
+// ============================================================================
+
+/// Search query tracked for market research
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct SearchQuery {
+    pub id: i64,
+    pub query: String,
+    pub source: String,
+    pub category: Option<String>,
+    pub search_count: i32,
+    pub last_searched_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchQuerySource {
+    TelegramBot,
+    WebDiscovery,
+    CatalogParse,
+    Manual,
+}
+
+impl SearchQuerySource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TelegramBot => "telegram_bot",
+            Self::WebDiscovery => "web_discovery",
+            Self::CatalogParse => "catalog_parse",
+            Self::Manual => "manual",
+        }
+    }
+}
+
+/// Discovery job for finding new products
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct DiscoveryJob {
+    pub id: i64,
+    pub source: String,
+    pub category: Option<String>,
+    pub query: Option<String>,
+    pub status: String,
+    pub products_found: Option<i32>,
+    pub products_new: Option<i32>,
+    pub scheduled_at: DateTime<Utc>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiscoverySource {
+    Duckduckgo,
+    OzonCatalog,
+    DnsCatalog,
+    YandexMarketCatalog,
+}
+
+impl DiscoverySource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Duckduckgo => "duckduckgo",
+            Self::OzonCatalog => "ozon_catalog",
+            Self::DnsCatalog => "dns_catalog",
+            Self::YandexMarketCatalog => "yandex_market_catalog",
+        }
+    }
+}
+
+/// Product popularity metrics from materialized view
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct ProductPopularity {
+    pub product_id: i64,
+    pub name: String,
+    pub category: Option<String>,
+    pub tracking_score: i32,
+    pub volatility_score: i32,
+    pub availability_score: i32,
+    pub arbitrage_score: i32,
+    pub tracking_count: i64,
+    pub min_price: Option<i32>,
+    pub max_price: Option<i32>,
+    pub store_count: Option<i64>,
+    pub calculated_at: DateTime<Utc>,
+}
+
+impl ProductPopularity {
+    /// Combined popularity score (0-100)
+    pub fn popularity_score(&self) -> i32 {
+        self.tracking_score + self.volatility_score + self.availability_score + self.arbitrage_score
+    }
+
+    /// Min price in rubles
+    pub fn min_price_rub(&self) -> Option<f64> {
+        self.min_price.map(|p| p as f64 / 100.0)
+    }
+
+    /// Max price in rubles
+    pub fn max_price_rub(&self) -> Option<f64> {
+        self.max_price.map(|p| p as f64 / 100.0)
+    }
+}
+
+/// Top product entry for API response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopProduct {
+    pub rank: i32,
+    pub product_id: i64,
+    pub name: String,
+    pub category: Option<String>,
+    pub popularity_score: i32,
+    pub tracking_count: i64,
+    pub min_price_rub: Option<i32>,
+    pub max_price_rub: Option<i32>,
+    pub store_count: i64,
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 

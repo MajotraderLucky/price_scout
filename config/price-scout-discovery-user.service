@@ -1,0 +1,37 @@
+[Unit]
+Description=Price Scout Discovery Service (User mode - local development)
+Documentation=https://github.com/yourusername/price_scout
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Development/price_scout
+
+# Environment variables
+Environment="DATABASE_URL=postgresql://postgres@192.168.0.10:5432/price_scout"
+
+# Run discovery workflow:
+# 1. Create new jobs from popular search queries
+# 2. Process pending discovery jobs
+# 3. Refresh popularity metrics
+ExecStart=/bin/bash -c '\
+    cd %h/Development/price_scout && \
+    echo "=== Price Scout Discovery ===" && \
+    echo "[1/3] Creating discovery jobs from popular queries..." && \
+    venv/bin/python scripts/discovery.py create-jobs --limit 20 && \
+    echo "[2/3] Processing pending discovery jobs..." && \
+    venv/bin/python scripts/discovery.py process-jobs --limit 10 && \
+    echo "[3/3] Refreshing popularity metrics..." && \
+    venv/bin/python scripts/discovery.py refresh-metrics && \
+    echo "=== Discovery complete ===" \
+'
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=price-scout-discovery
+
+# Timeout for discovery operations
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Price Scout Discovery Timer (User mode - hourly)
+Documentation=https://github.com/yourusername/price_scout
+Requires=price-scout-discovery-user.service
+
+[Timer]
+# Run every hour at minute 15
+OnCalendar=*:15:00
+
+# Randomize start time by up to 60 seconds
+RandomizedDelaySec=60sec
+
+# Run even if system was offline during scheduled time
+Persistent=true
+
+[Install]
+WantedBy=timers.target
