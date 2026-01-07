@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-06 (PS-40 Bot Localization to Russian)
+> Последнее обновление: 2026-01-07 (PS-43 Bot UX Improvements)
 
 ---
 
@@ -29,37 +29,39 @@
 
 ### Done
 
-| ID    | Задача                                 | Дата       | Результат                         |
-|-------|----------------------------------------|------------|-----------------------------------|
-| PS-40 | Bot Localization (Russian)             | 2026-01-06 | All UI strings translated to RU   |
-| PS-30 | Bot Notifications + Command Hints      | 2026-01-06 | Auto-notifications, footer hints  |
-| PS-39 | Market Research System                 | 2026-01-06 | Top 100, discovery, /top command  |
-| PS-8  | Telegram Bot (teloxide)                | 2026-01-06 | 10 commands, standalone DB mode   |
-| PS-38 | ML Price Predictions (Random Forest)   | 2026-01-05 | 7-day forecasts, Python ML script |
-| PS-37 | Arbitrage Detector                     | 2026-01-05 | Price differences across stores   |
-| PS-36 | Analytics Dashboard                    | 2026-01-05 | 6 endpoints (trends, correlation) |
-| PS-35 | Automated Scheduled Scraping           | 2026-01-05 | Scheduler + 2 binaries, 10-min    |
-| PS-34 | Currency Rates Tracking                | 2026-01-05 | Dual sources (CBR + open.er-api)  |
-| PS-33 | Add AliExpress Russia marketplace      | 2026-01-05 | Fallback DOM parser, 9th store    |
-| PS-28 | API Server (Axum REST endpoints)       | 2026-01-05 | 13 endpoints, analytics ready     |
-| PS-29 | Scraper Orchestration (Queue + Worker) | 2026-01-04 | Job queue + background worker     |
-| PS-23 | Python Bridge Implementation           | 2026-01-04 | Rust-Python subprocess bridge     |
-| PS-22 | Rust Workspace Bootstrap               | 2026-01-04 | 5 crates, 335 dependencies        |
-| PS-21 | PostgreSQL Schema Implementation       | 2026-01-04 | 7 tables, migrations applied      |
-| PS-20 | Управление Citilink Rate Limiting      | 2026-01-04 | Исключен из регулярных тестов     |
-| PS-19 | Фильтрация товаров по характеристикам  | 2026-01-03 | Phase 1: DNS specs filter (80%)   |
-| PS-18 | Исправить Citilink rate limiting       | 2026-01-03 | Задержки 90-210s, стабильно       |
-| PS-17 | Исправить парсер Avito                 | 2026-01-03 | Работает! 9/9 магазинов           |
-| PS-16 | Advanced bypass (Firefox/Warmup)       | 2025-12-31 | Серверная защита, не обходится    |
-| PS-15 | Stealth-тест на заблокированных        | 2025-12-31 | Citilink/DNS/Kotofoto - CAPTCHA   |
-| PS-14 | Stealth scraper (playwright-stealth)   | 2025-12-31 | stealth_scraper.py, regard.ru OK  |
-| PS-12 | Исследование доступных магазинов       | 2025-12-31 | 7 магазинов верифицировано        |
-| PS-13 | Верификация товара (5-point check)     | 2025-12-31 | find_macbook_price.py             |
-| PS-9  | Интеграция 2Captcha                    | 2025-12-31 | test_captcha_solver.py            |
-| PS-5  | Python прототип парсера                | 2025-12-31 | test_search.py, Playwright tests  |
-| PS-4  | Playwright тесты DNS/Citilink          | 2025-12-31 | Blocked by CAPTCHA/401            |
-| PS-3  | Путь обучения web scraping             | 2025-12-31 | [LEARNING_PATH.md]                |
-| PS-0  | Документация и планирование            | 2025-12-31 | [README.md]                       |
+| ID    | Задача                                 | Дата       | Результат                           |
+|-------|----------------------------------------|------------|-------------------------------------|
+| PS-43 | Bot UX - Inline Keyboards              | 2026-01-07 | All messages have command buttons   |
+| PS-42 | Analytics System (/stats, logging)     | 2026-01-07 | Stats command, command logging, fix |
+| PS-40 | Bot Localization (Russian)             | 2026-01-06 | All UI strings translated to RU     |
+| PS-30 | Bot Notifications + Command Hints      | 2026-01-06 | Auto-notifications, footer hints    |
+| PS-39 | Market Research System                 | 2026-01-06 | Top 100, discovery, /top command    |
+| PS-8  | Telegram Bot (teloxide)                | 2026-01-06 | 10 commands, standalone DB mode     |
+| PS-38 | ML Price Predictions (Random Forest)   | 2026-01-05 | 7-day forecasts, Python ML script   |
+| PS-37 | Arbitrage Detector                     | 2026-01-05 | Price differences across stores     |
+| PS-36 | Analytics Dashboard                    | 2026-01-05 | 6 endpoints (trends, correlation)   |
+| PS-35 | Automated Scheduled Scraping           | 2026-01-05 | Scheduler + 2 binaries, 10-min      |
+| PS-34 | Currency Rates Tracking                | 2026-01-05 | Dual sources (CBR + open.er-api)    |
+| PS-33 | Add AliExpress Russia marketplace      | 2026-01-05 | Fallback DOM parser, 9th store      |
+| PS-28 | API Server (Axum REST endpoints)       | 2026-01-05 | 13 endpoints, analytics ready       |
+| PS-29 | Scraper Orchestration (Queue + Worker) | 2026-01-04 | Job queue + background worker       |
+| PS-23 | Python Bridge Implementation           | 2026-01-04 | Rust-Python subprocess bridge       |
+| PS-22 | Rust Workspace Bootstrap               | 2026-01-04 | 5 crates, 335 dependencies          |
+| PS-21 | PostgreSQL Schema Implementation       | 2026-01-04 | 7 tables, migrations applied        |
+| PS-20 | Управление Citilink Rate Limiting      | 2026-01-04 | Исключен из регулярных тестов       |
+| PS-19 | Фильтрация товаров по характеристикам  | 2026-01-03 | Phase 1: DNS specs filter (80%)     |
+| PS-18 | Исправить Citilink rate limiting       | 2026-01-03 | Задержки 90-210s, стабильно         |
+| PS-17 | Исправить парсер Avito                 | 2026-01-03 | Работает! 9/9 магазинов             |
+| PS-16 | Advanced bypass (Firefox/Warmup)       | 2025-12-31 | Серверная защита, не обходится      |
+| PS-15 | Stealth-тест на заблокированных        | 2025-12-31 | Citilink/DNS/Kotofoto - CAPTCHA     |
+| PS-14 | Stealth scraper (playwright-stealth)   | 2025-12-31 | stealth_scraper.py, regard.ru OK    |
+| PS-12 | Исследование доступных магазинов       | 2025-12-31 | 7 магазинов верифицировано          |
+| PS-13 | Верификация товара (5-point check)     | 2025-12-31 | find_macbook_price.py               |
+| PS-9  | Интеграция 2Captcha                    | 2025-12-31 | test_captcha_solver.py              |
+| PS-5  | Python прототип парсера                | 2025-12-31 | test_search.py, Playwright tests    |
+| PS-4  | Playwright тесты DNS/Citilink          | 2025-12-31 | Blocked by CAPTCHA/401              |
+| PS-3  | Путь обучения web scraping             | 2025-12-31 | [LEARNING_PATH.md]                  |
+| PS-0  | Документация и планирование            | 2025-12-31 | [README.md]                         |
 
 ---
 
@@ -109,14 +111,14 @@
 | Метрика           | Значение         |
 |-------------------|------------------|
 | Фаза              | Phase 4 Complete |
-| Статус            | Market Research  |
+| Статус            | Bot UX Complete  |
 | Задач в Backlog   | 4                |
 | Задач In Progress | 0                |
 | Задач в Review    | 2                |
-| Задач Done        | 27               |
+| Задач Done        | 29               |
 | Python скриптов   | 25               |
 | Rust modules      | 10               |
-| Bot commands      | 10               |
+| Bot commands      | 11               |
 | Документов        | 20               |
 
 ---
@@ -221,6 +223,10 @@
 
 | Дата       | Изменение                                                         |
 |------------|-------------------------------------------------------------------|
+| 2026-01-07 | PS-43: Bot UX - inline keyboards for all messages, product lists  |
+| 2026-01-07 | PS-42: Analytics - /stats command, command logging, daily reports |
+| 2026-01-07 | fix: STDDEV type mismatch in get_price_trends (::float8 cast)     |
+| 2026-01-07 | fix: ML predictor SQL (CTE), venv/bin/python, currency_rates      |
 | 2026-01-06 | PS-40: Bot Localization - all UI strings translated to Russian    |
 | 2026-01-06 | PS-30: Bot Notifications - auto-analytics, command footer hints   |
 | 2026-01-06 | Project cleanup: reports moved to docs/reports/, debug files del  |
@@ -266,6 +272,77 @@
 ---
 
 ## Описание задач
+
+### PS-43: Bot UX - Inline Keyboards
+
+**Статус:** Complete (2026-01-07)
+
+**Цель:** Улучшить UX бота - добавить inline кнопки ко всем сообщениям, сделать кнопки функциональными.
+
+**Реализовано:**
+
+| Компонент                    | Описание                                    |
+|------------------------------|---------------------------------------------|
+| stats_keyboard()             | Период (24ч/7д/30д) + быстрые команды       |
+| quick_commands_keyboard()    | Цены, Тренды, Арбитраж, Топ                 |
+| product_keyboard()           | Цены, Тренды, Прогноз + Арбитраж, Топ, Стат |
+| products_list_keyboard()     | Список товаров с кнопками выбора            |
+
+**Callback handlers обновлены:**
+- cmd_price: показывает список товаров с кнопками
+- cmd_trends: показывает список товаров с кнопками
+- price_<id>: выполняет команду /price напрямую
+- trends_<id>: выполняет команду /trends напрямую
+- predict_<id>: выполняет команду /predict напрямую
+- cmd_stats: выполняет команду /stats
+
+**Файлы:**
+- crates/bot/src/main.rs (keyboards, callbacks, reply_markup)
+
+---
+
+### PS-42: Analytics System (/stats, command logging)
+
+**Статус:** Complete (2026-01-07)
+
+**Цель:** Добавить команду /stats для просмотра статистики системы, логирование команд.
+
+**Реализовано:**
+
+| Компонент            | Описание                              |
+|----------------------|---------------------------------------|
+| /stats command       | Статистика за 1д/7д/30д               |
+| command_log table    | Логирование всех команд пользователей |
+| Inline buttons       | Переключение периодов без ввода       |
+| ComprehensiveStats   | Агрегированная статистика системы     |
+
+**Формат /stats:**
+```
+[i] Price Scout - Статистика (7д)
+
+[SYS] Здоровье системы:
+  Скрейпинг: 220/220 (100%)
+  Магазины: 4/11 активных
+
+[USR] Пользователи:
+  Всего: 1
+  Команд за 7д: 15
+  Популярные: /stats (8)
+
+[MKT] Рынок:
+  Товаров: 5
+  Цен собрано: 20
+
+[TOP] Топ магазинов:
+  1. kns - 99K (мин)
+```
+
+**Файлы:**
+- crates/bot/src/main.rs (Command::Stats, format_stats_message)
+- crates/db/src/lib.rs (get_comprehensive_stats, log_command)
+- migrations/006_command_log.sql
+
+---
 
 ### PS-40: Bot Localization (Russian)
 
