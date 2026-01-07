@@ -24,13 +24,14 @@ pub struct ArbitrageInfo {
 
 /// Market statistics for notification
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct MarketStats {
     pub total_products: i64,
     pub total_prices: i64,
     pub min_price: i32,
     pub max_price: i32,
-    pub stores_working: i32,
-    pub stores_failed: i32,
+    pub stores_working: i32,  // TODO: populate in get_market_stats
+    pub stores_failed: i32,   // TODO: populate in get_market_stats
 }
 
 /// Notification service for sending analytics updates

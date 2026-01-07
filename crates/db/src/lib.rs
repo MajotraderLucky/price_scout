@@ -594,7 +594,7 @@ impl Database {
                 AVG(price)::float8 as avg_price,
                 MIN(price) as min_price,
                 MAX(price) as max_price,
-                STDDEV(price) as volatility
+                STDDEV(price)::float8 as volatility
             FROM store_prices
             WHERE product_id = $1
               AND scraped_at >= NOW() - INTERVAL '1 day' * $2
