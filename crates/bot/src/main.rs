@@ -153,6 +153,52 @@ fn product_keyboard(product_id: i64) -> InlineKeyboardMarkup {
     ])
 }
 
+/// Клавиатура со списком товаров для выбора
+/// action - префикс для callback: "price", "trends", "predict"
+fn products_list_keyboard(products: &[Product], action: &str) -> InlineKeyboardMarkup {
+    // Группируем по 2 кнопки в ряд, максимум 10 товаров
+    let rows: Vec<Vec<InlineKeyboardButton>> = products
+        .iter()
+        .take(10)
+        .map(|p| {
+            // Сокращаем название до 25 символов
+            let name: String = p.name.chars().take(25).collect();
+            let label = if p.name.chars().count() > 25 {
+                format!("{}...", name)
+            } else {
+                name
+            };
+            InlineKeyboardButton::callback(label, format!("{}_{}", action, p.id))
+        })
+        .collect::<Vec<_>>()
+        .chunks(2)
+        .map(|chunk| chunk.to_vec())
+        .collect();
+
+    InlineKeyboardMarkup::new(rows)
+}
+
+/// Форматирование списка товаров для выбора
+fn format_product_list(products: &[Product], header: &str) -> String {
+    let mut msg = format!("<b>{}</b>\n\n", header);
+
+    for (i, p) in products.iter().take(10).enumerate() {
+        let category = p.category.as_deref().unwrap_or("—");
+        msg.push_str(&format!(
+            "{}. <b>{}</b>\n   <i>{}</i>\n",
+            i + 1,
+            p.name,
+            category
+        ));
+    }
+
+    if products.len() > 10 {
+        msg.push_str(&format!("\n<i>... и ещё {} товаров</i>", products.len() - 10));
+    }
+
+    msg
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
@@ -312,14 +358,44 @@ async fn handle_callback(bot: Bot, q: CallbackQuery, db: Database) -> ResponseRe
         }
         // Quick command buttons
         "cmd_price" => {
-            bot.send_message(chat_id, "<b>💰 Цены</b>\n\nИспользуйте: /price &lt;id товара&gt;\n\nНапример: /price 1")
-                .parse_mode(ParseMode::Html)
-                .await?;
+            log_command_async(&db, user_id, "cmd_price", None).await;
+            match db.search_products("").await {
+                Ok(products) if !products.is_empty() => {
+                    let msg = format_product_list(&products, "💰 Выберите товар для просмотра цен:");
+                    let keyboard = products_list_keyboard(&products, "price");
+                    bot.send_message(chat_id, msg)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(keyboard)
+                        .await?;
+                }
+                Ok(_) => {
+                    bot.send_message(chat_id, "😕 Товары не найдены в базе данных.")
+                        .await?;
+                }
+                Err(e) => {
+                    bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                }
+            }
         }
         "cmd_trends" => {
-            bot.send_message(chat_id, "<b>📈 Тренды</b>\n\nИспользуйте: /trends &lt;id товара&gt;\n\nНапример: /trends 1")
-                .parse_mode(ParseMode::Html)
-                .await?;
+            log_command_async(&db, user_id, "cmd_trends", None).await;
+            match db.search_products("").await {
+                Ok(products) if !products.is_empty() => {
+                    let msg = format_product_list(&products, "📈 Выберите товар для просмотра трендов:");
+                    let keyboard = products_list_keyboard(&products, "trends");
+                    bot.send_message(chat_id, msg)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(keyboard)
+                        .await?;
+                }
+                Ok(_) => {
+                    bot.send_message(chat_id, "😕 Товары не найдены в базе данных.")
+                        .await?;
+                }
+                Err(e) => {
+                    bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                }
+            }
         }
         "cmd_arb" => {
             log_command_async(&db, user_id, "arbitrage", None).await;
@@ -378,23 +454,74 @@ async fn handle_callback(bot: Bot, q: CallbackQuery, db: Database) -> ResponseRe
         // Product-specific buttons - show command hints
         _ if data.starts_with("price_") => {
             if let Ok(product_id) = data[6..].parse::<i64>() {
-                bot.send_message(chat_id, format!("<b>💰 Цены товара #{}</b>\n\nВведите: /price {}", product_id, product_id))
-                    .parse_mode(ParseMode::Html)
-                    .await?;
+                log_command_async(&db, user_id, "price", Some(&product_id.to_string())).await;
+                match db.get_product(product_id).await {
+                    Ok(Some(product)) => {
+                        match db.get_best_prices(product_id, 10).await {
+                            Ok(prices) => {
+                                let mut price_data = Vec::new();
+                                for price in prices {
+                                    if let Ok(store) = db.get_store(price.store_id).await {
+                                        price_data.push((price, store));
+                                    }
+                                }
+                                let response = format_price_data(&product, &price_data);
+                                bot.send_message(chat_id, response)
+                                    .parse_mode(ParseMode::Html)
+                                    .reply_markup(product_keyboard(product_id))
+                                    .await?;
+                            }
+                            Err(e) => {
+                                bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        bot.send_message(chat_id, "😕 Товар не найден.").await?;
+                    }
+                    Err(e) => {
+                        bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                    }
+                }
             }
         }
         _ if data.starts_with("trends_") => {
             if let Ok(product_id) = data[7..].parse::<i64>() {
-                bot.send_message(chat_id, format!("<b>📈 Тренды товара #{}</b>\n\nВведите: /trends {}", product_id, product_id))
-                    .parse_mode(ParseMode::Html)
-                    .await?;
+                log_command_async(&db, user_id, "trends", Some(&product_id.to_string())).await;
+                match db.get_price_trends(product_id, 7).await {
+                    Ok(trends) if !trends.is_empty() => {
+                        let response = format_price_trends(product_id, &trends);
+                        bot.send_message(chat_id, response)
+                            .parse_mode(ParseMode::Html)
+                            .reply_markup(product_keyboard(product_id))
+                            .await?;
+                    }
+                    Ok(_) => {
+                        bot.send_message(chat_id, format!("😕 История цен не найдена для товара {}", product_id))
+                            .await?;
+                    }
+                    Err(e) => {
+                        bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                    }
+                }
             }
         }
         _ if data.starts_with("predict_") => {
             if let Ok(product_id) = data[8..].parse::<i64>() {
-                bot.send_message(chat_id, format!("<b>🔮 Прогноз товара #{}</b>\n\nВведите: /predict {}", product_id, product_id))
-                    .parse_mode(ParseMode::Html)
-                    .await?;
+                log_command_async(&db, user_id, "predict", Some(&product_id.to_string())).await;
+                match call_ml_predictor(product_id).await {
+                    Ok(prediction) => {
+                        let response = format_price_prediction(&prediction);
+                        bot.send_message(chat_id, response)
+                            .parse_mode(ParseMode::Html)
+                            .reply_markup(product_keyboard(product_id))
+                            .await?;
+                    }
+                    Err(_) => {
+                        bot.send_message(chat_id, "😕 ML модель недоступна. Используйте /predict для прогноза.")
+                            .await?;
+                    }
+                }
             }
         }
         _ => {
