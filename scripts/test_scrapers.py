@@ -97,6 +97,7 @@ STORES: List[StoreConfig] = [
         search_url="https://www.centershot.ru/search/?q={query}",
         parser="centershot",
         validate_price=False,  # Different price range (small items)
+        unstable=True,  # Store for hunting accessories, not electronics
     ),
     StoreConfig(
         name="i-ray",
@@ -111,15 +112,15 @@ STORES: List[StoreConfig] = [
     StoreConfig(
         name="kns",
         method="playwright_direct",
-        search_url="https://www.kns.ru/product/noutbuk-apple-macbook-pro-16-2021-{query}/",
-        url_type="product",
-        lowercase=True,
+        search_url="https://www.kns.ru/catalog/noutbuki/apple/",
+        url_type="catalog",  # Static catalog page, no query substitution
     ),
     StoreConfig(
         name="nix",
         method="playwright_direct",
-        search_url="https://www.nix.ru/autocatalog/apple_notebook/{query}-Noutbuk-Apple-MacBook-Pro-162-Apple-M1-Pro-10-core-32GB-512GB-SSD-Mac-OS-{query}-seryj-kosmos_574636.html",
-        url_type="product",
+        search_url="https://www.nix.ru/price/?filter={query}",
+        delay=3,  # Wait for JS to load prices
+        unstable=True,  # Prices loaded via JS, needs investigation
     ),
     StoreConfig(
         name="citilink",
@@ -130,9 +131,9 @@ STORES: List[StoreConfig] = [
     ),
     StoreConfig(
         name="dns",
-        method="firefox",
-        search_url="https://www.dns-shop.ru/catalog/recipe/b70b01357dbede01/apple-macbook-pro/",
-        parser="dns_json",
+        method="playwright_stealth",
+        search_url="https://www.dns-shop.ru/search/?q={query}",
+        unstable=True,  # Strong bot protection - HTTP 401
     ),
     StoreConfig(
         name="yandex_market",
@@ -143,9 +144,10 @@ STORES: List[StoreConfig] = [
     ),
     StoreConfig(
         name="ozon",
-        method="ozon_firefox",
-        search_url="https://www.ozon.ru/search/?text=MacBook+Pro+16&from_global=true",
-        parser="ozon_json",
+        method="playwright_stealth",
+        search_url="https://www.ozon.ru/search/?text={query}&from_global=true",
+        delay=3,
+        unstable=True,  # Strong bot protection - HTTP 403
     ),
     StoreConfig(
         name="avito",
@@ -1635,7 +1637,7 @@ def run_test(store: StoreConfig, query: str) -> TestResult:
         )
 
 
-def run_all_tests(query: str, skip_firefox: bool = False, skip_unstable: bool = False, store_filter: str = None) -> List[TestResult]:
+def run_all_tests(query: str, skip_firefox: bool = False, skip_unstable: bool = False, store_filter: str = None, json_mode: bool = False) -> List[TestResult]:
     """Запуск всех тестов"""
     results = []
 
@@ -1664,17 +1666,19 @@ def run_all_tests(query: str, skip_firefox: bool = False, skip_unstable: bool = 
             ))
             continue
 
-        print(f"\n[TEST] {store.name} ({store.method})")
+        if not json_mode:
+            print(f"\n[TEST] {store.name} ({store.method})")
         result = run_test(store, query)
         results.append(result)
 
         # Статус
-        if result.passed:
-            print(f"  [PASS] {format_price(result.price)}")
-        else:
-            print(f"  [{result.status}] {result.error}")
+        if not json_mode:
+            if result.passed:
+                print(f"  [PASS] {format_price(result.price)}")
+            else:
+                print(f"  [{result.status}] {result.error}")
 
-        print(f"  Time: {result.response_time:.1f}s")
+            print(f"  Time: {result.response_time:.1f}s")
 
         # Пауза между тестами
         if store.method != "firefox":
@@ -1847,7 +1851,7 @@ def main():
         print(f"Stores to test: {len([s for s in STORES if not store_filter or s.name == store_filter])}")
 
     # Запуск тестов
-    results = run_all_tests(TEST_ARTICLE, skip_firefox=skip_firefox, skip_unstable=skip_unstable, store_filter=store_filter)
+    results = run_all_tests(TEST_ARTICLE, skip_firefox=skip_firefox, skip_unstable=skip_unstable, store_filter=store_filter, json_mode=json_mode)
 
     # Output based on mode
     if json_mode:

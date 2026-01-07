@@ -1,0 +1,25 @@
+---
+- name: Apply database migration
+  hosts: archbook
+  become: yes
+
+  tasks:
+    - name: Copy migration file
+      copy:
+        src: ../migrations/006_command_log.sql
+        dest: /tmp/006_command_log.sql
+        mode: '0644'
+
+    - name: Apply migration
+      become_user: postgres
+      shell: psql -d price_scout -f /tmp/006_command_log.sql
+      register: migration_result
+
+    - name: Show migration result
+      debug:
+        var: migration_result.stdout_lines
+
+    - name: Cleanup migration file
+      file:
+        path: /tmp/006_command_log.sql
+        state: absent
