@@ -110,13 +110,21 @@ enum Command {
 // INLINE KEYBOARDS
 // ============================================================================
 
-/// Клавиатура для команды /stats
+/// Клавиатура для команды /stats (период + быстрые команды)
 fn stats_keyboard() -> InlineKeyboardMarkup {
-    InlineKeyboardMarkup::new(vec![vec![
-        InlineKeyboardButton::callback("24 часа", "stats_1"),
-        InlineKeyboardButton::callback("7 дней", "stats_7"),
-        InlineKeyboardButton::callback("30 дней", "stats_30"),
-    ]])
+    InlineKeyboardMarkup::new(vec![
+        vec![
+            InlineKeyboardButton::callback("24 часа", "stats_1"),
+            InlineKeyboardButton::callback("7 дней", "stats_7"),
+            InlineKeyboardButton::callback("30 дней", "stats_30"),
+        ],
+        vec![
+            InlineKeyboardButton::callback("📊 Цены", "cmd_price"),
+            InlineKeyboardButton::callback("📈 Тренды", "cmd_trends"),
+            InlineKeyboardButton::callback("💰 Арбитраж", "cmd_arb"),
+            InlineKeyboardButton::callback("🏆 Топ", "cmd_top"),
+        ],
+    ])
 }
 
 /// Универсальная клавиатура быстрых команд
@@ -129,13 +137,20 @@ fn quick_commands_keyboard() -> InlineKeyboardMarkup {
     ]])
 }
 
-/// Клавиатура для результатов поиска товара
+/// Клавиатура для результатов поиска товара (действия + быстрые команды)
 fn product_keyboard(product_id: i64) -> InlineKeyboardMarkup {
-    InlineKeyboardMarkup::new(vec![vec![
-        InlineKeyboardButton::callback("💰 Цены", format!("price_{}", product_id)),
-        InlineKeyboardButton::callback("📈 Тренды", format!("trends_{}", product_id)),
-        InlineKeyboardButton::callback("🔮 Прогноз", format!("predict_{}", product_id)),
-    ]])
+    InlineKeyboardMarkup::new(vec![
+        vec![
+            InlineKeyboardButton::callback("💰 Цены", format!("price_{}", product_id)),
+            InlineKeyboardButton::callback("📈 Тренды", format!("trends_{}", product_id)),
+            InlineKeyboardButton::callback("🔮 Прогноз", format!("predict_{}", product_id)),
+        ],
+        vec![
+            InlineKeyboardButton::callback("💸 Арбитраж", "cmd_arb"),
+            InlineKeyboardButton::callback("🏆 Топ", "cmd_top"),
+            InlineKeyboardButton::callback("📊 Статистика", "cmd_stats"),
+        ],
+    ])
 }
 
 #[tokio::main]
@@ -337,6 +352,22 @@ async fn handle_callback(bot: Bot, q: CallbackQuery, db: Database) -> ResponseRe
                     bot.send_message(chat_id, msg)
                         .parse_mode(ParseMode::Html)
                         .reply_markup(quick_commands_keyboard())
+                        .await?;
+                }
+                Err(e) => {
+                    bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                }
+            }
+        }
+        "cmd_stats" => {
+            log_command_async(&db, user_id, "stats", Some("7")).await;
+            let stats = db.get_comprehensive_stats(7).await;
+            match stats {
+                Ok(s) => {
+                    let msg = format_stats_message(&s);
+                    bot.send_message(chat_id, msg)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(stats_keyboard())
                         .await?;
                 }
                 Err(e) => {
@@ -636,6 +667,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
 
             bot.send_message(chat_id, format_start_message())
                 .parse_mode(ParseMode::Html)
+                .reply_markup(quick_commands_keyboard())
                 .await?;
         }
 
@@ -643,6 +675,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
             log_command_async(&db, user_id, "help", None).await;
             bot.send_message(chat_id, format_help_message())
                 .parse_mode(ParseMode::Html)
+                .reply_markup(quick_commands_keyboard())
                 .await?;
         }
 
@@ -668,6 +701,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                         let response = format_search_results(&products);
                         bot.send_message(chat_id, response)
                             .parse_mode(ParseMode::Html)
+                            .reply_markup(quick_commands_keyboard())
                             .await?;
                     }
                 }
@@ -706,6 +740,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                                     let response = format_price_data(&product, &price_data);
                                     bot.send_message(chat_id, response)
                                         .parse_mode(ParseMode::Html)
+                                        .reply_markup(product_keyboard(product_id))
                                         .await?;
                                 }
                                 Err(e) => {
@@ -760,6 +795,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                                 let response = format_price_trends(product_id, &trends);
                                 bot.send_message(chat_id, response)
                                     .parse_mode(ParseMode::Html)
+                                    .reply_markup(product_keyboard(product_id))
                                     .await?;
                             }
                         }
@@ -789,6 +825,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                             let response = format_price_prediction(&prediction);
                             bot.send_message(chat_id, response)
                                 .parse_mode(ParseMode::Html)
+                                .reply_markup(product_keyboard(product_id))
                                 .await?;
                         }
                         Err(e) => {
@@ -823,6 +860,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                         let response = format_arbitrage(&opportunities);
                         bot.send_message(chat_id, response)
                             .parse_mode(ParseMode::Html)
+                            .reply_markup(quick_commands_keyboard())
                             .await?;
                     }
                 }
@@ -850,6 +888,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                                 let response = format_store_comparison(product_id, &stores);
                                 bot.send_message(chat_id, response)
                                     .parse_mode(ParseMode::Html)
+                                    .reply_markup(product_keyboard(product_id))
                                     .await?;
                             }
                         }
@@ -883,6 +922,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                     let response = format_web_search_results(&results);
                     bot.send_message(chat_id, response)
                         .parse_mode(ParseMode::Html)
+                        .reply_markup(quick_commands_keyboard())
                         .await?;
                 }
                 Err(e) => {
@@ -916,6 +956,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                         let response = format_top_products(&products);
                         bot.send_message(chat_id, response)
                             .parse_mode(ParseMode::Html)
+                            .reply_markup(quick_commands_keyboard())
                             .await?;
                     }
                 }
