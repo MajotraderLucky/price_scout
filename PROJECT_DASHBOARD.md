@@ -10,10 +10,8 @@
 
 | ID    | Задача                          | Приоритет | План               |
 |-------|---------------------------------|-----------|--------------------|
-| PS-10 | Тест 2Captcha на реальном сайте | High      | [LEARNING_PATH.md] |
-| PS-11 | Тест парсинга с домашнего ПК    | High      | [API_ENDPOINTS.md] |
-| PS-6  | Настроить PostgreSQL схему      | Medium    | [TECH_STACK.md]    |
-| PS-7  | Настроить Redis кэширование     | Medium    | [TECH_STACK.md]    |
+| PS-10 | Тест 2Captcha на реальном сайте | Medium    | [LEARNING_PATH.md] |
+| PS-7  | Настроить Redis кэширование     | Low       | [TECH_STACK.md]    |
 
 ### In Progress
 
@@ -22,10 +20,8 @@
 
 ### Review
 
-| ID   | Задача                                   | Приоритет | План                             |
-|------|------------------------------------------|-----------|----------------------------------|
-| PS-1 | Диагностика API E-katalog.ru             | High      | [API_ENDPOINTS.md] - BLOCKED     |
-| PS-2 | Исследовать альтернативные источники     | High      | [API_ENDPOINTS.md] - NEEDS PROXY |
+| ID | Задача | Приоритет | План |
+|----|--------|-----------|------|
 
 ### Done
 
@@ -113,9 +109,9 @@
 |-------------------|------------------|
 | Фаза              | Phase 4 Complete |
 | Статус            | Bot UX Complete  |
-| Задач в Backlog   | 4                |
+| Задач в Backlog   | 2                |
 | Задач In Progress | 0                |
-| Задач в Review    | 2                |
+| Задач в Review    | 0                |
 | Задач Done        | 30               |
 | Python скриптов   | 25               |
 | Rust modules      | 10               |
