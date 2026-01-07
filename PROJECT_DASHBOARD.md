@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-07 (PS-43 Bot UX Improvements)
+> Последнее обновление: 2026-01-07 (PS-44 Currency Auto-Collection)
 
 ---
 
@@ -31,6 +31,7 @@
 
 | ID    | Задача                                 | Дата       | Результат                           |
 |-------|----------------------------------------|------------|-------------------------------------|
+| PS-44 | Currency Auto-Collection (systemd)     | 2026-01-07 | Daily timer 12:00, CBR API          |
 | PS-43 | Bot UX - Inline Keyboards              | 2026-01-07 | All messages have command buttons   |
 | PS-42 | Analytics System (/stats, logging)     | 2026-01-07 | Stats command, command logging, fix |
 | PS-40 | Bot Localization (Russian)             | 2026-01-06 | All UI strings translated to RU     |
@@ -115,7 +116,7 @@
 | Задач в Backlog   | 4                |
 | Задач In Progress | 0                |
 | Задач в Review    | 2                |
-| Задач Done        | 29               |
+| Задач Done        | 30               |
 | Python скриптов   | 25               |
 | Rust modules      | 10               |
 | Bot commands      | 11               |
@@ -223,6 +224,7 @@
 
 | Дата       | Изменение                                                         |
 |------------|-------------------------------------------------------------------|
+| 2026-01-07 | PS-44: Currency Auto-Collection - systemd timer daily 12:00 MSK   |
 | 2026-01-07 | PS-43: Bot UX - inline keyboards for all messages, product lists  |
 | 2026-01-07 | PS-42: Analytics - /stats command, command logging, daily reports |
 | 2026-01-07 | fix: STDDEV type mismatch in get_price_trends (::float8 cast)     |
@@ -272,6 +274,44 @@
 ---
 
 ## Описание задач
+
+### PS-44: Currency Auto-Collection
+
+**Статус:** Complete (2026-01-07)
+
+**Цель:** Настроить автоматический сбор курсов валют для ML-предиктора.
+
+**Реализовано:**
+
+| Компонент                            | Описание                           |
+|--------------------------------------|------------------------------------|
+| price-scout-currency-user.service    | Oneshot сервис для сбора курсов    |
+| price-scout-currency-user.timer      | Таймер: ежедневно в 12:00 MSK      |
+| collect_currency_rates.py            | Python скрипт (ЦБ РФ API)          |
+
+**Расписание:**
+- ЦБ РФ обновляет курсы в 11:30 MSK
+- Таймер запускается в 12:00 MSK (+5 мин random delay)
+- Сохраняет USD и EUR курсы в currency_rates
+
+**Использование курсов:**
+- ML-предиктор использует USD/EUR как фичи для прогнозирования цен
+- Корреляция курсов валют с ценами на импортную электронику
+
+**Текущие данные:**
+```
+currency_rates:
+ id | currency_code | rate_to_rub | source
+  1 | USD           | 78.2267     | cbr_ru
+  2 | EUR           | 92.0938     | cbr_ru
+```
+
+**Файлы:**
+- config/price-scout-currency-user.service
+- config/price-scout-currency-user.timer
+- scripts/collect_currency_rates.py
+
+---
 
 ### PS-43: Bot UX - Inline Keyboards
 
