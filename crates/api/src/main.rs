@@ -27,6 +27,14 @@
 //! - `GET /api/market-research/categories` - Get list of product categories
 //! - `POST /api/market-research/refresh` - Refresh popularity metrics (materialized view)
 //!
+//! ### Bot Statistics Endpoints
+//! - `GET /api/stats/summary?days=7` - Get comprehensive bot statistics
+//! - `GET /api/stats/health?days=7` - Get system health metrics
+//! - `GET /api/stats/users?days=7` - Get user statistics
+//! - `GET /api/stats/market?days=7` - Get market analytics
+//! - `GET /api/stats/stores` - Get store rankings
+//! - `GET /api/stats/commands?days=7` - Get command usage statistics
+//!
 //! ## Usage
 //!
 //! ```bash
@@ -43,7 +51,7 @@ use axum::{
     Json, Router,
 };
 use price_scout_db::Database;
-use price_scout_models::{Product, Store, StorePrice};
+use price_scout_models::{CommandUsage, MarketStats as ModelMarketStats, Product, Store, StorePrice, StoreRanking, SystemStats, UserStats};
 use price_scout_scraper::{JobStats, ScraperQueue};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -296,6 +304,47 @@ struct RefreshMetricsResponse {
     message: String,
 }
 
+// ============================================================================
+// BOT STATISTICS TYPES
+// ============================================================================
+
+/// Query parameters for stats endpoints
+#[derive(Debug, Deserialize)]
+struct StatsQuery {
+    #[serde(default = "default_stats_days")]
+    days: i32,
+}
+
+fn default_stats_days() -> i32 {
+    7
+}
+
+/// Stats summary response
+#[derive(Debug, Serialize)]
+struct StatsSummaryResponse {
+    period_days: i32,
+    generated_at: String,
+    system: SystemStats,
+    users: UserStats,
+    market: ModelMarketStats,
+    stores: Vec<StoreRanking>,
+    top_commands: Vec<CommandUsage>,
+}
+
+/// Store ranking response
+#[derive(Debug, Serialize)]
+struct StatsStoresResponse {
+    stores: Vec<StoreRanking>,
+    count: usize,
+}
+
+/// Command usage response
+#[derive(Debug, Serialize)]
+struct StatsCommandsResponse {
+    commands: Vec<CommandUsage>,
+    count: usize,
+}
+
 /// Price prediction response
 #[derive(Debug, Serialize, Deserialize)]
 struct PricePredictionResponse {
@@ -406,6 +455,13 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/market-research/popular-queries", get(get_popular_queries))
         .route("/api/market-research/categories", get(get_categories))
         .route("/api/market-research/refresh", post(refresh_popularity_metrics))
+        // Bot Statistics endpoints
+        .route("/api/stats/summary", get(get_stats_summary))
+        .route("/api/stats/health", get(get_stats_health))
+        .route("/api/stats/users", get(get_stats_users))
+        .route("/api/stats/market", get(get_stats_market))
+        .route("/api/stats/stores", get(get_stats_stores))
+        .route("/api/stats/commands", get(get_stats_commands))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
 
@@ -433,6 +489,12 @@ async fn main() -> anyhow::Result<()> {
     info!("   GET  /api/market-research/popular-queries");
     info!("   GET  /api/market-research/categories");
     info!("   POST /api/market-research/refresh");
+    info!("   GET  /api/stats/summary");
+    info!("   GET  /api/stats/health");
+    info!("   GET  /api/stats/users");
+    info!("   GET  /api/stats/market");
+    info!("   GET  /api/stats/stores");
+    info!("   GET  /api/stats/commands");
 
     axum::serve(listener, app)
         .await
@@ -787,4 +849,66 @@ async fn refresh_popularity_metrics(
         status: "success".to_string(),
         message: "Popularity metrics refreshed successfully".to_string(),
     }))
+}
+
+// ============================================================================
+// BOT STATISTICS HANDLERS
+// ============================================================================
+
+async fn get_stats_summary(
+    State(state): State<AppState>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<StatsSummaryResponse>, ApiError> {
+    let stats = state.db.get_comprehensive_stats(query.days).await?;
+
+    Ok(Json(StatsSummaryResponse {
+        period_days: stats.period_days,
+        generated_at: chrono::Utc::now().to_rfc3339(),
+        system: stats.system,
+        users: stats.users,
+        market: stats.market,
+        stores: stats.stores,
+        top_commands: stats.top_commands,
+    }))
+}
+
+async fn get_stats_health(
+    State(state): State<AppState>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<SystemStats>, ApiError> {
+    let stats = state.db.get_system_stats(query.days).await?;
+    Ok(Json(stats))
+}
+
+async fn get_stats_users(
+    State(state): State<AppState>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<UserStats>, ApiError> {
+    let stats = state.db.get_user_stats(query.days).await?;
+    Ok(Json(stats))
+}
+
+async fn get_stats_market(
+    State(state): State<AppState>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<ModelMarketStats>, ApiError> {
+    let stats = state.db.get_market_stats(query.days).await?;
+    Ok(Json(stats))
+}
+
+async fn get_stats_stores(
+    State(state): State<AppState>,
+) -> Result<Json<StatsStoresResponse>, ApiError> {
+    let stores = state.db.get_store_rankings().await?;
+    let count = stores.len();
+    Ok(Json(StatsStoresResponse { stores, count }))
+}
+
+async fn get_stats_commands(
+    State(state): State<AppState>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<StatsCommandsResponse>, ApiError> {
+    let commands = state.db.get_command_usage(query.days).await?;
+    let count = commands.len();
+    Ok(Json(StatsCommandsResponse { commands, count }))
 }

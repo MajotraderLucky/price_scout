@@ -31,7 +31,7 @@ use teloxide::{
     dispatching::{Dispatcher, UpdateFilterExt},
     dptree,
     prelude::*,
-    types::{ParseMode, Update},
+    types::{CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, Update},
     utils::command::BotCommands,
 };
 use tracing::{error, info, warn};
@@ -102,6 +102,40 @@ enum Command {
     Web(String),
     #[command(description = "Топ товаров: /top [лимит]")]
     Top(String),
+    #[command(description = "Статистика бота: /stats [период]")]
+    Stats(String),
+}
+
+// ============================================================================
+// INLINE KEYBOARDS
+// ============================================================================
+
+/// Клавиатура для команды /stats
+fn stats_keyboard() -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![vec![
+        InlineKeyboardButton::callback("24 часа", "stats_1"),
+        InlineKeyboardButton::callback("7 дней", "stats_7"),
+        InlineKeyboardButton::callback("30 дней", "stats_30"),
+    ]])
+}
+
+/// Универсальная клавиатура быстрых команд
+fn quick_commands_keyboard() -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![vec![
+        InlineKeyboardButton::callback("📊 Цены", "cmd_price"),
+        InlineKeyboardButton::callback("📈 Тренды", "cmd_trends"),
+        InlineKeyboardButton::callback("💰 Арбитраж", "cmd_arb"),
+        InlineKeyboardButton::callback("🏆 Топ", "cmd_top"),
+    ]])
+}
+
+/// Клавиатура для результатов поиска товара
+fn product_keyboard(product_id: i64) -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![vec![
+        InlineKeyboardButton::callback("💰 Цены", format!("price_{}", product_id)),
+        InlineKeyboardButton::callback("📈 Тренды", format!("trends_{}", product_id)),
+        InlineKeyboardButton::callback("🔮 Прогноз", format!("predict_{}", product_id)),
+    ]])
 }
 
 #[tokio::main]
@@ -147,9 +181,17 @@ async fn main() -> Result<()> {
     });
     info!("✅ Notification poller started");
 
+    // Start daily report scheduler in background
+    let bot_for_daily = bot.clone();
+    let db_for_daily = db.clone();
+    tokio::spawn(async move {
+        notifications::daily_report_scheduler(bot_for_daily, db_for_daily).await;
+    });
+    info!("✅ Daily report scheduler started (09:00 MSK)");
+
     info!("🚀 Bot is running...");
 
-    // Set up handler with commands and text messages
+    // Set up handler with commands, text messages, and callback queries
     let handler = dptree::entry()
         .branch(
             Update::filter_message()
@@ -159,6 +201,10 @@ async fn main() -> Result<()> {
         .branch(
             Update::filter_message()
                 .endpoint(handle_text_message),
+        )
+        .branch(
+            Update::filter_callback_query()
+                .endpoint(handle_callback),
         );
 
     Dispatcher::builder(bot, handler)
@@ -174,6 +220,160 @@ async fn main() -> Result<()> {
 /// Handle bot commands (wrapper for Dispatcher)
 async fn handle_command(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseResult<()> {
     answer(bot, msg, cmd, db).await
+}
+
+/// Handle callback queries from inline keyboard buttons
+async fn handle_callback(bot: Bot, q: CallbackQuery, db: Database) -> ResponseResult<()> {
+    let data = match &q.data {
+        Some(d) => d.as_str(),
+        None => {
+            bot.answer_callback_query(&q.id).await?;
+            return Ok(());
+        }
+    };
+
+    let chat_id = match q.message.as_ref() {
+        Some(msg) => msg.chat().id,
+        None => {
+            bot.answer_callback_query(&q.id).await?;
+            return Ok(());
+        }
+    };
+
+    // Get user for logging (optional - don't block if it fails)
+    let telegram_id = q.from.id.0 as i64;
+    let user = db.get_user_by_telegram_id(telegram_id).await.ok().flatten();
+    let user_id = user.as_ref().map(|u| u.id);
+
+    match data {
+        // Stats period buttons
+        "stats_1" => {
+            log_command_async(&db, user_id, "stats", Some("1")).await;
+            let stats = db.get_comprehensive_stats(1).await;
+            match stats {
+                Ok(s) => {
+                    let msg = format_stats_message(&s);
+                    bot.send_message(chat_id, msg)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(stats_keyboard())
+                        .await?;
+                }
+                Err(e) => {
+                    bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                }
+            }
+        }
+        "stats_7" => {
+            log_command_async(&db, user_id, "stats", Some("7")).await;
+            let stats = db.get_comprehensive_stats(7).await;
+            match stats {
+                Ok(s) => {
+                    let msg = format_stats_message(&s);
+                    bot.send_message(chat_id, msg)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(stats_keyboard())
+                        .await?;
+                }
+                Err(e) => {
+                    bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                }
+            }
+        }
+        "stats_30" => {
+            log_command_async(&db, user_id, "stats", Some("30")).await;
+            let stats = db.get_comprehensive_stats(30).await;
+            match stats {
+                Ok(s) => {
+                    let msg = format_stats_message(&s);
+                    bot.send_message(chat_id, msg)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(stats_keyboard())
+                        .await?;
+                }
+                Err(e) => {
+                    bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                }
+            }
+        }
+        // Quick command buttons
+        "cmd_price" => {
+            bot.send_message(chat_id, "<b>💰 Цены</b>\n\nИспользуйте: /price &lt;id товара&gt;\n\nНапример: /price 1")
+                .parse_mode(ParseMode::Html)
+                .await?;
+        }
+        "cmd_trends" => {
+            bot.send_message(chat_id, "<b>📈 Тренды</b>\n\nИспользуйте: /trends &lt;id товара&gt;\n\nНапример: /trends 1")
+                .parse_mode(ParseMode::Html)
+                .await?;
+        }
+        "cmd_arb" => {
+            log_command_async(&db, user_id, "arbitrage", None).await;
+            // Execute arbitrage command
+            let results = db.find_arbitrage_opportunities(10.0).await;
+            match results {
+                Ok(opps) if !opps.is_empty() => {
+                    let msg = format_arbitrage(&opps);
+                    bot.send_message(chat_id, msg)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(quick_commands_keyboard())
+                        .await?;
+                }
+                Ok(_) => {
+                    bot.send_message(chat_id, "[i] Арбитражных возможностей не найдено")
+                        .reply_markup(quick_commands_keyboard())
+                        .await?;
+                }
+                Err(e) => {
+                    bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                }
+            }
+        }
+        "cmd_top" => {
+            log_command_async(&db, user_id, "top", None).await;
+            let products = db.get_top_products(10).await;
+            match products {
+                Ok(prods) => {
+                    let msg = format_top_products(&prods);
+                    bot.send_message(chat_id, msg)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(quick_commands_keyboard())
+                        .await?;
+                }
+                Err(e) => {
+                    bot.send_message(chat_id, format!("[X] Ошибка: {}", e)).await?;
+                }
+            }
+        }
+        // Product-specific buttons - show command hints
+        _ if data.starts_with("price_") => {
+            if let Ok(product_id) = data[6..].parse::<i64>() {
+                bot.send_message(chat_id, format!("<b>💰 Цены товара #{}</b>\n\nВведите: /price {}", product_id, product_id))
+                    .parse_mode(ParseMode::Html)
+                    .await?;
+            }
+        }
+        _ if data.starts_with("trends_") => {
+            if let Ok(product_id) = data[7..].parse::<i64>() {
+                bot.send_message(chat_id, format!("<b>📈 Тренды товара #{}</b>\n\nВведите: /trends {}", product_id, product_id))
+                    .parse_mode(ParseMode::Html)
+                    .await?;
+            }
+        }
+        _ if data.starts_with("predict_") => {
+            if let Ok(product_id) = data[8..].parse::<i64>() {
+                bot.send_message(chat_id, format!("<b>🔮 Прогноз товара #{}</b>\n\nВведите: /predict {}", product_id, product_id))
+                    .parse_mode(ParseMode::Html)
+                    .await?;
+            }
+        }
+        _ => {
+            warn!("Unknown callback data: {}", data);
+        }
+    }
+
+    // Answer callback to remove loading indicator
+    bot.answer_callback_query(&q.id).await?;
+    Ok(())
 }
 
 /// Clean search query from common prefixes and noise
@@ -401,12 +601,21 @@ async fn call_web_search(query: &str, max_results: i32) -> Result<WebSearchRespo
     Ok(response)
 }
 
+/// Log command execution (fire-and-forget)
+async fn log_command_async(db: &Database, user_id: Option<i64>, command: &str, args: Option<&str>) {
+    if let Err(e) = db.log_command(user_id, command, args).await {
+        warn!("Failed to log command: {}", e);
+    }
+}
+
 /// Handle bot commands
 async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseResult<()> {
     let chat_id = msg.chat.id;
+    let user_id = msg.from.as_ref().map(|u| u.id.0 as i64);
 
     match cmd {
         Command::Start => {
+            log_command_async(&db, user_id, "start", None).await;
             // Save user's chat_id for notifications
             if let Some(user) = &msg.from {
                 let telegram_id = user.id.0 as i64;
@@ -431,12 +640,14 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         }
 
         Command::Help => {
+            log_command_async(&db, user_id, "help", None).await;
             bot.send_message(chat_id, format_help_message())
                 .parse_mode(ParseMode::Html)
                 .await?;
         }
 
         Command::Search(query) => {
+            log_command_async(&db, user_id, "search", Some(&query)).await;
             info!("Search command received - query length: {}, query: '{}'", query.len(), query);
 
             if query.trim().is_empty() {
@@ -469,6 +680,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         }
 
         Command::Price(product_id_str) => {
+            log_command_async(&db, user_id, "price", Some(&product_id_str)).await;
             match product_id_str.trim().parse::<i64>() {
                 Ok(product_id) => {
                     bot.send_message(chat_id, format!("💰 Получаю цены для товара {}...", product_id))
@@ -522,6 +734,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         }
 
         Command::Trends(args) => {
+            log_command_async(&db, user_id, "trends", Some(&args)).await;
             let parts: Vec<&str> = args.split_whitespace().collect();
             if parts.is_empty() {
                 bot.send_message(chat_id, "❌ Укажите ID товара.\n\nПример: /trends 1 30")
@@ -565,6 +778,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         }
 
         Command::Predict(product_id_str) => {
+            log_command_async(&db, user_id, "predict", Some(&product_id_str)).await;
             match product_id_str.trim().parse::<i64>() {
                 Ok(product_id) => {
                     bot.send_message(chat_id, format!("🔮 Прогнозирую цену для товара {}...", product_id))
@@ -592,6 +806,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         }
 
         Command::Arbitrage(min_profit_str) => {
+            log_command_async(&db, user_id, "arbitrage", Some(&min_profit_str)).await;
             let min_profit = min_profit_str.trim()
                 .parse::<f64>()
                 .unwrap_or(10.0);
@@ -620,6 +835,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         }
 
         Command::Compare(product_id_str) => {
+            log_command_async(&db, user_id, "compare", Some(&product_id_str)).await;
             match product_id_str.trim().parse::<i64>() {
                 Ok(product_id) => {
                     bot.send_message(chat_id, format!("🏪 Сравниваю магазины для товара {}...", product_id))
@@ -652,6 +868,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         }
 
         Command::Web(query) => {
+            log_command_async(&db, user_id, "web", Some(&query)).await;
             if query.trim().is_empty() {
                 bot.send_message(chat_id, "❌ Укажите запрос.\n\nПример: /web рогатка centershot")
                     .await?;
@@ -677,6 +894,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
         }
 
         Command::Top(limit_str) => {
+            log_command_async(&db, user_id, "top", Some(&limit_str)).await;
             let limit = limit_str.trim()
                 .parse::<i32>()
                 .unwrap_or(10)
@@ -704,6 +922,30 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                 Err(e) => {
                     error!("Failed to get top products: {:#}", e);
                     bot.send_message(chat_id, "❌ Ошибка загрузки рейтинга. Попробуйте позже.")
+                        .await?;
+                }
+            }
+        }
+
+        Command::Stats(period_str) => {
+            log_command_async(&db, user_id, "stats", Some(&period_str)).await;
+            // Parse period: "7d", "24h", "30d" or just number of days
+            let days = parse_period(&period_str).unwrap_or(7);
+
+            bot.send_message(chat_id, format!("[i] Собираю статистику за {} дней...", days))
+                .await?;
+
+            match db.get_comprehensive_stats(days).await {
+                Ok(stats) => {
+                    let response = format_stats_message(&stats);
+                    bot.send_message(chat_id, response)
+                        .parse_mode(ParseMode::Html)
+                        .reply_markup(stats_keyboard())
+                        .await?;
+                }
+                Err(e) => {
+                    error!("Failed to get stats: {:#}", e);
+                    bot.send_message(chat_id, "[X] Ошибка загрузки статистики. Попробуйте позже.")
                         .await?;
                 }
             }
@@ -1149,4 +1391,98 @@ fn truncate_name(name: &str, max_len: usize) -> String {
         let truncated: String = name.chars().take(max_len - 3).collect();
         format!("{}...", truncated)
     }
+}
+
+/// Parse period string like "7d", "24h", "30d" into days
+fn parse_period(period: &str) -> Option<i32> {
+    let period = period.trim().to_lowercase();
+
+    if period.is_empty() {
+        return None;
+    }
+
+    // Check for "24h" format
+    if period.ends_with('h') {
+        let hours: i32 = period.trim_end_matches('h').parse().ok()?;
+        return Some((hours + 23) / 24); // Round up to days
+    }
+
+    // Check for "7d" format
+    if period.ends_with('d') {
+        return period.trim_end_matches('d').parse().ok();
+    }
+
+    // Try plain number
+    period.parse().ok()
+}
+
+/// Format comprehensive bot statistics message
+fn format_stats_message(stats: &price_scout_models::BotStats) -> String {
+    let mut msg = format!(
+        "<b>[i] Price Scout - Статистика ({}д)</b>\n",
+        stats.period_days
+    );
+    msg.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
+
+    // System health
+    msg.push_str("<b>[SYS] Здоровье системы:</b>\n");
+    msg.push_str(&format!(
+        "  Скрейпинг: {}/{} ({:.0}%)\n",
+        stats.system.jobs_success,
+        stats.system.jobs_success + stats.system.jobs_failed,
+        stats.system.success_rate
+    ));
+    msg.push_str(&format!(
+        "  Магазины: {}/{} активных\n",
+        stats.system.stores_active,
+        stats.system.stores_total
+    ));
+    msg.push_str(&format!("  Батчей: {}\n", stats.system.batches_total));
+
+    if let Some(last) = &stats.system.last_batch_at {
+        let time_str = last.format("%H:%M").to_string();
+        msg.push_str(&format!("  Последний: {}\n", time_str));
+    }
+
+    // Users
+    msg.push_str("\n<b>[USR] Пользователи:</b>\n");
+    msg.push_str(&format!("  Всего: {}\n", stats.users.total));
+    msg.push_str(&format!("  С уведомлениями: {}\n", stats.users.with_notifications));
+    msg.push_str(&format!("  Команд за {}д: {}\n", stats.period_days, stats.users.commands_count));
+
+    // Top commands
+    if !stats.top_commands.is_empty() {
+        let top_cmds: Vec<String> = stats.top_commands.iter()
+            .take(3)
+            .map(|c| format!("/{} ({})", c.command, c.count))
+            .collect();
+        msg.push_str(&format!("  Популярные: {}\n", top_cmds.join(", ")));
+    }
+
+    // Market
+    msg.push_str("\n<b>[MKT] Рынок:</b>\n");
+    msg.push_str(&format!("  Товаров: {}\n", stats.market.products));
+    msg.push_str(&format!("  Цен собрано: {}\n", stats.market.prices_collected));
+    msg.push_str(&format!("  Изменений цен: {}\n", stats.market.price_changes));
+    msg.push_str(&format!("  Арбитраж: {} возможностей\n", stats.market.arbitrage_opportunities));
+
+    // Store rankings
+    if !stats.stores.is_empty() {
+        msg.push_str("\n<b>[TOP] Топ магазинов:</b>\n");
+        for store in stats.stores.iter().take(3) {
+            let price_k = store.avg_price / 1000;
+            let cheapest = if store.is_cheapest { " (мин)" } else { "" };
+            msg.push_str(&format!(
+                "  {}. {} - {}K{}\n",
+                store.rank,
+                store.store_name,
+                price_k,
+                cheapest
+            ));
+        }
+    }
+
+    msg.push_str("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    msg
 }

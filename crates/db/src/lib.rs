@@ -1360,3 +1360,237 @@ impl Database {
         Ok(log_id)
     }
 }
+
+// ============================================================================
+// BOT STATISTICS OPERATIONS
+// ============================================================================
+
+impl Database {
+    /// Log command execution
+    pub async fn log_command(
+        &self,
+        user_id: Option<i64>,
+        command: &str,
+        args: Option<&str>,
+    ) -> Result<i64> {
+        let log_id = sqlx::query_scalar::<_, i64>(
+            r#"
+            INSERT INTO command_log (user_id, command, args)
+            VALUES ($1, $2, $3)
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(command)
+        .bind(args)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to log command")?;
+
+        Ok(log_id)
+    }
+
+    /// Get command usage statistics for a period
+    pub async fn get_command_usage(&self, days: i32) -> Result<Vec<CommandUsage>> {
+        let usage = sqlx::query_as::<_, CommandUsage>(
+            r#"
+            SELECT command, COUNT(*) as count
+            FROM command_log
+            WHERE executed_at >= NOW() - INTERVAL '1 day' * $1
+            GROUP BY command
+            ORDER BY count DESC
+            LIMIT 10
+            "#,
+        )
+        .bind(days)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch command usage")?;
+
+        Ok(usage)
+    }
+
+    /// Get system statistics for a period
+    pub async fn get_system_stats(&self, days: i32) -> Result<SystemStats> {
+        // Get batch statistics
+        let batch_stats = sqlx::query_as::<_, (i64, i64, i64, Option<chrono::DateTime<chrono::Utc>>)>(
+            r#"
+            SELECT
+                COUNT(*) as batches_total,
+                COALESCE(SUM(jobs_success), 0) as jobs_success,
+                COALESCE(SUM(jobs_failed), 0) as jobs_failed,
+                MAX(completed_at) as last_batch_at
+            FROM scraping_batches
+            WHERE started_at >= NOW() - INTERVAL '1 day' * $1
+            "#,
+        )
+        .bind(days)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to fetch batch stats")?;
+
+        // Get store counts
+        let store_counts = sqlx::query_as::<_, (i64, i64)>(
+            r#"
+            SELECT
+                COUNT(*) FILTER (WHERE NOT unstable) as active,
+                COUNT(*) as total
+            FROM stores
+            "#,
+        )
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to fetch store counts")?;
+
+        let total_jobs = batch_stats.1 + batch_stats.2;
+        let success_rate = if total_jobs > 0 {
+            batch_stats.1 as f64 / total_jobs as f64 * 100.0
+        } else {
+            0.0
+        };
+
+        Ok(SystemStats {
+            batches_total: batch_stats.0,
+            jobs_success: batch_stats.1,
+            jobs_failed: batch_stats.2,
+            success_rate,
+            stores_active: store_counts.0 as i32,
+            stores_total: store_counts.1 as i32,
+            last_batch_at: batch_stats.3,
+        })
+    }
+
+    /// Get user statistics for a period
+    pub async fn get_user_stats(&self, days: i32) -> Result<UserStats> {
+        let user_stats = sqlx::query_as::<_, (i64, i64, i64)>(
+            r#"
+            SELECT
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE notifications_enabled = true) as with_notifications,
+                COUNT(*) FILTER (WHERE last_active_at >= NOW() - INTERVAL '1 day' * $1) as active_users
+            FROM users
+            "#,
+        )
+        .bind(days)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to fetch user stats")?;
+
+        // Get command count for period
+        let commands_count = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*) FROM command_log
+            WHERE executed_at >= NOW() - INTERVAL '1 day' * $1
+            "#,
+        )
+        .bind(days)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or(0);
+
+        Ok(UserStats {
+            total: user_stats.0,
+            with_notifications: user_stats.1,
+            commands_count,
+            active_users: user_stats.2,
+        })
+    }
+
+    /// Get market statistics for a period
+    pub async fn get_market_stats(&self, days: i32) -> Result<MarketStats> {
+        let market_stats = sqlx::query_as::<_, (i64, i64, Option<i32>, Option<i32>)>(
+            r#"
+            SELECT
+                COUNT(DISTINCT product_id) as products,
+                COUNT(*) as prices_collected,
+                MIN(price) as min_price,
+                MAX(price) as max_price
+            FROM store_prices
+            WHERE scraped_at >= NOW() - INTERVAL '1 day' * $1
+              AND available = true
+            "#,
+        )
+        .bind(days)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to fetch market stats")?;
+
+        // Get price changes count
+        let price_changes = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*) FROM price_change_events
+            WHERE detected_at >= NOW() - INTERVAL '1 day' * $1
+            "#,
+        )
+        .bind(days)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or(0);
+
+        // Get arbitrage count
+        let arbitrage = self.find_arbitrage_opportunities(5.0).await.unwrap_or_default();
+
+        Ok(MarketStats {
+            products: market_stats.0,
+            prices_collected: market_stats.1,
+            price_changes,
+            arbitrage_opportunities: arbitrage.len() as i64,
+            min_price: market_stats.2,
+            max_price: market_stats.3,
+        })
+    }
+
+    /// Get store rankings by average price
+    pub async fn get_store_rankings(&self) -> Result<Vec<StoreRanking>> {
+        let rankings = sqlx::query_as::<_, (String, f64, i64)>(
+            r#"
+            SELECT
+                s.name,
+                AVG(sp.price)::float8 as avg_price,
+                COUNT(*) as prices_count
+            FROM stores s
+            LEFT JOIN store_prices sp ON s.id = sp.store_id AND sp.available = true
+            WHERE NOT s.unstable
+            GROUP BY s.id, s.name
+            HAVING COUNT(*) > 0
+            ORDER BY avg_price ASC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch store rankings")?;
+
+        let min_avg = rankings.first().map(|r| r.1).unwrap_or(0.0);
+
+        Ok(rankings
+            .into_iter()
+            .enumerate()
+            .map(|(i, (name, avg, count))| StoreRanking {
+                rank: (i + 1) as i32,
+                store_name: name,
+                avg_price: avg as i32,
+                prices_count: count,
+                success_rate: 100.0, // TODO: calculate from jobs
+                is_cheapest: (avg - min_avg).abs() < 1.0,
+            })
+            .collect())
+    }
+
+    /// Get comprehensive bot statistics
+    pub async fn get_comprehensive_stats(&self, days: i32) -> Result<BotStats> {
+        let system = self.get_system_stats(days).await?;
+        let users = self.get_user_stats(days).await?;
+        let market = self.get_market_stats(days).await?;
+        let stores = self.get_store_rankings().await?;
+        let top_commands = self.get_command_usage(days).await?;
+
+        Ok(BotStats {
+            period_days: days,
+            system,
+            users,
+            market,
+            stores,
+            top_commands,
+        })
+    }
+}

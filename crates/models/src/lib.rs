@@ -416,6 +416,87 @@ pub struct TopProduct {
 }
 
 // ============================================================================
+// BOT STATISTICS MODELS
+// ============================================================================
+
+/// Comprehensive bot statistics
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BotStats {
+    /// Period in days
+    pub period_days: i32,
+    /// System health metrics
+    pub system: SystemStats,
+    /// User metrics
+    pub users: UserStats,
+    /// Market metrics
+    pub market: MarketStats,
+    /// Store rankings
+    pub stores: Vec<StoreRanking>,
+    /// Top commands
+    pub top_commands: Vec<CommandUsage>,
+}
+
+/// System health statistics
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SystemStats {
+    pub batches_total: i64,
+    pub jobs_success: i64,
+    pub jobs_failed: i64,
+    pub success_rate: f64,
+    pub stores_active: i32,
+    pub stores_total: i32,
+    pub last_batch_at: Option<DateTime<Utc>>,
+}
+
+/// User statistics
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UserStats {
+    pub total: i64,
+    pub with_notifications: i64,
+    pub commands_count: i64,
+    pub active_users: i64,
+}
+
+/// Market statistics
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MarketStats {
+    pub products: i64,
+    pub prices_collected: i64,
+    pub price_changes: i64,
+    pub arbitrage_opportunities: i64,
+    pub min_price: Option<i32>,
+    pub max_price: Option<i32>,
+}
+
+/// Store ranking entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoreRanking {
+    pub rank: i32,
+    pub store_name: String,
+    pub avg_price: i32,
+    pub prices_count: i64,
+    pub success_rate: f64,
+    pub is_cheapest: bool,
+}
+
+/// Command usage statistics
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct CommandUsage {
+    pub command: String,
+    pub count: i64,
+}
+
+/// Command log entry
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct CommandLog {
+    pub id: i64,
+    pub user_id: Option<i64>,
+    pub command: String,
+    pub args: Option<String>,
+    pub executed_at: DateTime<Utc>,
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
