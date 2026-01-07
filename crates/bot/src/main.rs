@@ -710,7 +710,8 @@ async fn show_full_product_info(
 async fn call_ml_predictor(product_id: i64) -> Result<PricePredictionResponse> {
     use tokio::process::Command;
 
-    let output = Command::new("python3")
+    // Use venv Python for ML dependencies
+    let output = Command::new("venv/bin/python")
         .arg("scripts/ml_predictor.py")
         .arg("predict")
         .arg("--product-id")

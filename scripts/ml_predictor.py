@@ -107,26 +107,35 @@ def fetch_training_data(product_id: int, days: int = 90) -> pd.DataFrame:
 
     # Note: Using store_prices instead of price_history
     # since price_history table might not exist yet
+    # Using CTE to avoid subquery reference issues with GROUP BY
     query = """
-        SELECT
-            DATE(sp.scraped_at) as date,
-            AVG(sp.price)::float as price,
-            (SELECT AVG(rate_to_rub)::float
-             FROM currency_rates
-             WHERE currency_code = 'USD'
-               AND DATE(recorded_at) = DATE(sp.scraped_at)
-            ) as usd_rate,
-            (SELECT AVG(rate_to_rub)::float
-             FROM currency_rates
-             WHERE currency_code = 'EUR'
-               AND DATE(recorded_at) = DATE(sp.scraped_at)
-            ) as eur_rate
-        FROM store_prices sp
-        WHERE sp.product_id = %s
-          AND sp.available = true
-          AND sp.scraped_at >= NOW() - INTERVAL '%s days'
-        GROUP BY DATE(sp.scraped_at)
-        ORDER BY date
+        WITH prices AS (
+            SELECT
+                DATE(scraped_at) as date,
+                AVG(price)::float as price
+            FROM store_prices
+            WHERE product_id = %s
+              AND available = true
+              AND scraped_at >= NOW() - INTERVAL '%s days'
+            GROUP BY DATE(scraped_at)
+        ),
+        usd_rates AS (
+            SELECT DATE(recorded_at) as date, AVG(rate_to_rub)::float as rate
+            FROM currency_rates
+            WHERE currency_code = 'USD'
+            GROUP BY DATE(recorded_at)
+        ),
+        eur_rates AS (
+            SELECT DATE(recorded_at) as date, AVG(rate_to_rub)::float as rate
+            FROM currency_rates
+            WHERE currency_code = 'EUR'
+            GROUP BY DATE(recorded_at)
+        )
+        SELECT p.date, p.price, u.rate as usd_rate, e.rate as eur_rate
+        FROM prices p
+        LEFT JOIN usd_rates u ON p.date = u.date
+        LEFT JOIN eur_rates e ON p.date = e.date
+        ORDER BY p.date
     """
 
     df = pd.read_sql(query, conn, params=(product_id, days))
