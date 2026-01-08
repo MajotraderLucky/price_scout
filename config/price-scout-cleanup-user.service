@@ -1,0 +1,16 @@
+[Unit]
+Description=Price Scout Store Cleanup
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/sergey/price_scout
+Environment=DATABASE_URL=postgresql://postgres@localhost:5432/price_scout
+ExecStart=/home/sergey/price_scout/venv/bin/python /home/sergey/price_scout/scripts/store_cleanup.py --execute --verbose
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
