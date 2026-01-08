@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-08 (PS-46 Complete - All 4 Phases Done)
+> Последнее обновление: 2026-01-08 (PS-47 Smart Price Alerts)
 
 ---
 
@@ -25,42 +25,43 @@
 
 ### Done
 
-| ID    | Задача                                 | Дата       | Результат                                      |
-|-------|----------------------------------------|------------|------------------------------------------------|
-| PS-46 | Система аналитики магазинов (Complete) | 2026-01-08 | 4 phases: CRUD, AutoImport, Arbitrage, Cleanup |
-| PS-45 | Улучшить веб-поиск (извлечение цен)    | 2026-01-08 | Playwright + DuckDuckGo integration            |
-| PS-44 | Currency Auto-Collection (systemd)     | 2026-01-07 | Daily timer 12:00, CBR API                     |
-| PS-43 | Bot UX - Inline Keyboards              | 2026-01-07 | All messages have command buttons              |
-| PS-42 | Analytics System (/stats, logging)     | 2026-01-07 | Stats command, command logging, fix            |
-| PS-40 | Bot Localization (Russian)             | 2026-01-06 | All UI strings translated to RU                |
-| PS-30 | Bot Notifications + Command Hints      | 2026-01-06 | Auto-notifications, footer hints               |
-| PS-39 | Market Research System                 | 2026-01-06 | Top 100, discovery, /top command               |
-| PS-8  | Telegram Bot (teloxide)                | 2026-01-06 | 10 commands, standalone DB mode                |
-| PS-38 | ML Price Predictions (Random Forest)   | 2026-01-05 | 7-day forecasts, Python ML script              |
-| PS-37 | Arbitrage Detector                     | 2026-01-05 | Price differences across stores                |
-| PS-36 | Analytics Dashboard                    | 2026-01-05 | 6 endpoints (trends, correlation)              |
-| PS-35 | Automated Scheduled Scraping           | 2026-01-05 | Scheduler + 2 binaries, 10-min                 |
-| PS-34 | Currency Rates Tracking                | 2026-01-05 | Dual sources (CBR + open.er-api)               |
-| PS-33 | Add AliExpress Russia marketplace      | 2026-01-05 | Fallback DOM parser, 9th store                 |
-| PS-28 | API Server (Axum REST endpoints)       | 2026-01-05 | 13 endpoints, analytics ready                  |
-| PS-29 | Scraper Orchestration (Queue + Worker) | 2026-01-04 | Job queue + background worker                  |
-| PS-23 | Python Bridge Implementation           | 2026-01-04 | Rust-Python subprocess bridge                  |
-| PS-22 | Rust Workspace Bootstrap               | 2026-01-04 | 5 crates, 335 dependencies                     |
-| PS-21 | PostgreSQL Schema Implementation       | 2026-01-04 | 7 tables, migrations applied                   |
-| PS-20 | Управление Citilink Rate Limiting      | 2026-01-04 | Исключен из регулярных тестов                  |
-| PS-19 | Фильтрация товаров по характеристикам  | 2026-01-03 | Phase 1: DNS specs filter (80%)                |
-| PS-18 | Исправить Citilink rate limiting       | 2026-01-03 | Задержки 90-210s, стабильно                    |
-| PS-17 | Исправить парсер Avito                 | 2026-01-03 | Работает! 9/9 магазинов                        |
-| PS-16 | Advanced bypass (Firefox/Warmup)       | 2025-12-31 | Серверная защита, не обходится                 |
-| PS-15 | Stealth-тест на заблокированных        | 2025-12-31 | Citilink/DNS/Kotofoto - CAPTCHA                |
-| PS-14 | Stealth scraper (playwright-stealth)   | 2025-12-31 | stealth_scraper.py, regard.ru OK               |
-| PS-12 | Исследование доступных магазинов       | 2025-12-31 | 7 магазинов верифицировано                     |
-| PS-13 | Верификация товара (5-point check)     | 2025-12-31 | find_macbook_price.py                          |
-| PS-9  | Интеграция 2Captcha                    | 2025-12-31 | test_captcha_solver.py                         |
-| PS-5  | Python прототип парсера                | 2025-12-31 | test_search.py, Playwright tests               |
-| PS-4  | Playwright тесты DNS/Citilink          | 2025-12-31 | Blocked by CAPTCHA/401                         |
-| PS-3  | Путь обучения web scraping             | 2025-12-31 | [LEARNING_PATH.md]                             |
-| PS-0  | Документация и планирование            | 2025-12-31 | [README.md]                                    |
+| ID    | Задача                                 | Дата       | Результат                                         |
+|-------|----------------------------------------|------------|---------------------------------------------------|
+| PS-47 | Умные ценовые алерты                   | 2026-01-08 | Auto-subscribe, currency analysis, Telegram notif |
+| PS-46 | Система аналитики магазинов (Complete) | 2026-01-08 | 4 phases: CRUD, AutoImport, Arbitrage, Cleanup    |
+| PS-45 | Улучшить веб-поиск (извлечение цен)    | 2026-01-08 | Playwright + DuckDuckGo integration               |
+| PS-44 | Currency Auto-Collection (systemd)     | 2026-01-07 | Daily timer 12:00, CBR API                        |
+| PS-43 | Bot UX - Inline Keyboards              | 2026-01-07 | All messages have command buttons                 |
+| PS-42 | Analytics System (/stats, logging)     | 2026-01-07 | Stats command, command logging, fix               |
+| PS-40 | Bot Localization (Russian)             | 2026-01-06 | All UI strings translated to RU                   |
+| PS-30 | Bot Notifications + Command Hints      | 2026-01-06 | Auto-notifications, footer hints                  |
+| PS-39 | Market Research System                 | 2026-01-06 | Top 100, discovery, /top command                  |
+| PS-8  | Telegram Bot (teloxide)                | 2026-01-06 | 10 commands, standalone DB mode                   |
+| PS-38 | ML Price Predictions (Random Forest)   | 2026-01-05 | 7-day forecasts, Python ML script                 |
+| PS-37 | Arbitrage Detector                     | 2026-01-05 | Price differences across stores                   |
+| PS-36 | Analytics Dashboard                    | 2026-01-05 | 6 endpoints (trends, correlation)                 |
+| PS-35 | Automated Scheduled Scraping           | 2026-01-05 | Scheduler + 2 binaries, 10-min                    |
+| PS-34 | Currency Rates Tracking                | 2026-01-05 | Dual sources (CBR + open.er-api)                  |
+| PS-33 | Add AliExpress Russia marketplace      | 2026-01-05 | Fallback DOM parser, 9th store                    |
+| PS-28 | API Server (Axum REST endpoints)       | 2026-01-05 | 13 endpoints, analytics ready                     |
+| PS-29 | Scraper Orchestration (Queue + Worker) | 2026-01-04 | Job queue + background worker                     |
+| PS-23 | Python Bridge Implementation           | 2026-01-04 | Rust-Python subprocess bridge                     |
+| PS-22 | Rust Workspace Bootstrap               | 2026-01-04 | 5 crates, 335 dependencies                        |
+| PS-21 | PostgreSQL Schema Implementation       | 2026-01-04 | 7 tables, migrations applied                      |
+| PS-20 | Управление Citilink Rate Limiting      | 2026-01-04 | Исключен из регулярных тестов                     |
+| PS-19 | Фильтрация товаров по характеристикам  | 2026-01-03 | Phase 1: DNS specs filter (80%)                   |
+| PS-18 | Исправить Citilink rate limiting       | 2026-01-03 | Задержки 90-210s, стабильно                       |
+| PS-17 | Исправить парсер Avito                 | 2026-01-03 | Работает! 9/9 магазинов                           |
+| PS-16 | Advanced bypass (Firefox/Warmup)       | 2025-12-31 | Серверная защита, не обходится                    |
+| PS-15 | Stealth-тест на заблокированных        | 2025-12-31 | Citilink/DNS/Kotofoto - CAPTCHA                   |
+| PS-14 | Stealth scraper (playwright-stealth)   | 2025-12-31 | stealth_scraper.py, regard.ru OK                  |
+| PS-12 | Исследование доступных магазинов       | 2025-12-31 | 7 магазинов верифицировано                        |
+| PS-13 | Верификация товара (5-point check)     | 2025-12-31 | find_macbook_price.py                             |
+| PS-9  | Интеграция 2Captcha                    | 2025-12-31 | test_captcha_solver.py                            |
+| PS-5  | Python прототип парсера                | 2025-12-31 | test_search.py, Playwright tests                  |
+| PS-4  | Playwright тесты DNS/Citilink          | 2025-12-31 | Blocked by CAPTCHA/401                            |
+| PS-3  | Путь обучения web scraping             | 2025-12-31 | [LEARNING_PATH.md]                                |
+| PS-0  | Документация и планирование            | 2025-12-31 | [README.md]                                       |
 
 ---
 
@@ -110,33 +111,39 @@
 
 ## Project Stats
 
-| Метрика           | Значение              |
-|-------------------|-----------------------|
-| Фаза              | Phase 4 Complete      |
-| Статус            | PS-46 Complete        |
-| Задач в Backlog   | 2                     |
-| Задач In Progress | 0                     |
-| Задач в Review    | 0                     |
-| Задач Done        | 31                    |
-| Python скриптов   | 29                    |
-| Rust modules      | 10                    |
-| Bot commands      | 11                    |
-| Документов        | 20                    |
-| API endpoints     | 18                    |
+| Метрика           | Значение         |
+|-------------------|------------------|
+| Фаза              | Phase 4 Complete |
+| Статус            | PS-47 Complete   |
+| Задач в Backlog   | 2                |
+| Задач In Progress | 0                |
+| Задач в Review    | 0                |
+| Задач Done        | 32               |
+| Python скриптов   | 29               |
+| Rust modules      | 11               |
+| Bot commands      | 11               |
+| Документов        | 20               |
+| API endpoints     | 18               |
+| DB migrations     | 10               |
 
 ---
 
 ## Current Focus
 
-**Статус: MARKET RESEARCH SYSTEM COMPLETE - Phase 4 Done!**
+**Статус: PS-47 SMART PRICE ALERTS COMPLETE!**
 
-**Новые возможности (Phase 4):**
-- [+] Market Research System: Top 100 популярных товаров (1,000-15,000 RUB)
-- [+] Product Discovery: DuckDuckGo поиск + hourly scheduler
-- [+] Popularity Scoring: 4 метрики (tracking, volatility, availability, arbitrage)
-- [+] Telegram /top command: Просмотр рейтинга популярности
-- [+] Telegram /web command: Веб-поиск через DuckDuckGo
-- [+] API endpoints: /api/market-research/* (top-100, popular-queries, categories)
+**Новые возможности (PS-47):**
+- [+] Smart Price Alerts: Автоматические уведомления о падении цен
+- [+] Currency Correlation: Анализ причины изменения (валюта vs рынок)
+- [+] Auto-Subscribe: Подписка при /search, /price, /trends, /compare
+- [+] Inline Unsubscribe: Кнопка отписки в каждом алерте
+- [+] Background Checker: Проверка каждые 30 минут
+
+**Возможности (PS-46):**
+- [+] Store CRUD API: Управление магазинами через REST API
+- [+] Auto-Import: Автоматическое обнаружение магазинов из веб-поиска
+- [+] Arbitrage Analytics: SQL функции для арбитража
+- [+] Store Auto-Cleanup: Ежедневная очистка неактивных магазинов
 
 **Возможности (Phase 3):**
 - [+] Analytics API (6 endpoints): Price trends, currency correlation, store comparison, market overview
@@ -226,6 +233,9 @@
 
 | Дата       | Изменение                                                         |
 |------------|-------------------------------------------------------------------|
+| 2026-01-08 | PS-47: Smart Price Alerts - auto-subscribe, currency analysis     |
+| 2026-01-08 | PS-46 Phase 4: Store Auto-Cleanup - daily timer, health functions |
+| 2026-01-08 | PS-46 Phase 3: Arbitrage Analytics - SQL functions, migration 008 |
 | 2026-01-08 | PS-46 Phase 2: Auto-Import - store_discovery.py, web_search track |
 | 2026-01-08 | PS-46 Phase 1: CRUD API - migrations, stores endpoint, health     |
 | 2026-01-08 | PS-45: Web Search Price Extraction - Playwright + DuckDuckGo      |
@@ -280,20 +290,69 @@
 
 ## Описание задач
 
+### PS-47: Smart Price Alerts (ценовые алерты)
+
+**Статус:** Complete (2026-01-08)
+
+**Цель:** Автоматические уведомления о падении цен с анализом причины изменения.
+
+**Реализовано:**
+
+| Компонент                   | Описание                                        |
+|-----------------------------|-------------------------------------------------|
+| migrations/010_price_alerts | Таблицы user_price_alerts, price_alert_log      |
+| price_alerts.rs             | Background checker (каждые 30 мин)              |
+| Auto-subscribe              | При /search, /price, /trends, /compare          |
+| Currency analysis           | Определение причины: валюта vs рынок            |
+| Inline keyboard             | Кнопки "Посмотреть цены" / "Отписаться"         |
+
+**Как работает:**
+
+```
+Пользователь: /search MacBook
+        ↓
+Bot: Показывает результаты + автоподписка на первые 3 товара
+        ↓
+[Через N часов цена упала на 5%+]
+        ↓
+Bot отправляет алерт:
+┌──────────────────────────────────────────────────────────┐
+│ [!] Цена снизилась!                                      │
+│                                                          │
+│ MacBook Pro 16 M4                                        │
+│ DNS-Shop: 149,990 RUB -> 142,490 RUB (-5.0%)            │
+│                                                          │
+│ Анализ причины:                                          │
+│ [!] рыночная скидка/акция                               │
+│ [o] USD упал на 1.2%                                    │
+│                                                          │
+│ [Посмотреть цены] [Отписаться]                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Файлы:**
+- migrations/010_price_alerts.sql
+- crates/bot/src/price_alerts.rs
+- crates/bot/src/main.rs (auto-subscribe + callbacks)
+- crates/db/src/lib.rs (price alert operations)
+- crates/models/src/lib.rs (UserPriceAlert, AlertToCheck, etc.)
+
+---
+
 ### PS-46: Store Analytics System (арбитраж)
 
-**Статус:** In Progress (Phase 2 Complete)
+**Статус:** Complete (2026-01-08)
 
 **Цель:** Система аналитики до 100 магазинов с автоимпортом и арбитражем.
 
 **Прогресс:**
 
-| Phase   | Описание                        | Статус      |
-|---------|---------------------------------|-------------|
-| Phase 1 | CRUD API для магазинов          | [+] Done    |
-| Phase 2 | Автоимпорт из веб-поиска        | [+] Done    |
-| Phase 3 | Аналитика арбитража             | [ ] Pending |
-| Phase 4 | Автоочистка неактивных          | [ ] Pending |
+| Phase   | Описание                 | Статус   |
+|---------|--------------------------|----------|
+| Phase 1 | CRUD API для магазинов   | [+] Done |
+| Phase 2 | Автоимпорт из веб-поиска | [+] Done |
+| Phase 3 | Аналитика арбитража      | [+] Done |
+| Phase 4 | Автоочистка неактивных   | [+] Done |
 
 **Phase 1 - CRUD API (Complete):**
 - [+] Migration 007_store_management.sql - расширение stores, store_candidates
