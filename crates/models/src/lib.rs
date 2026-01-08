@@ -742,6 +742,88 @@ pub struct StorePairArbitrage {
 }
 
 // ============================================================================
+// PRICE ALERTS (PS-47)
+// ============================================================================
+
+/// User price alert subscription
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct UserPriceAlert {
+    pub id: i64,
+    pub user_id: i64,
+    pub product_id: i64,
+    pub alert_type: String,
+    pub target_price: Option<i32>,
+    pub min_drop_percent: Option<f64>,
+    pub baseline_price: i32,
+    pub baseline_currency_usd: Option<f64>,
+    pub baseline_currency_eur: Option<f64>,
+    pub enabled: bool,
+    pub last_alert_at: Option<DateTime<Utc>>,
+    pub alert_count: i32,
+    pub created_at: DateTime<Utc>,
+    pub source: String,
+}
+
+/// Alert to check with user chat_id
+#[derive(Debug, Clone, FromRow)]
+pub struct AlertToCheck {
+    pub alert_id: i64,
+    pub user_id: i64,
+    pub product_id: i64,
+    pub alert_type: String,
+    pub target_price: Option<i32>,
+    pub min_drop_percent: Option<f64>,
+    pub baseline_price: i32,
+    pub baseline_currency_usd: Option<f64>,
+    pub baseline_currency_eur: Option<f64>,
+    pub chat_id: i64,
+}
+
+/// Analysis of price change cause
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PriceChangeAnalysis {
+    pub old_price: i32,
+    pub new_price: i32,
+    pub change_percent: f64,
+    pub currency_usd_change: Option<f64>,
+    pub currency_eur_change: Option<f64>,
+    pub likely_cause: String, // "currency", "market", "mixed", "unknown"
+}
+
+impl PriceChangeAnalysis {
+    /// Get human-readable cause description (Russian)
+    pub fn cause_description_ru(&self) -> &'static str {
+        match self.likely_cause.as_str() {
+            "currency" => "изменение курса валют",
+            "market" => "рыночная скидка/акция",
+            "mixed" => "частично курс валют",
+            _ => "причина неизвестна",
+        }
+    }
+
+    /// Format price change as string
+    pub fn format_change(&self) -> String {
+        let sign = if self.change_percent < 0.0 { "" } else { "+" };
+        format!("{}{:.1}%", sign, self.change_percent)
+    }
+}
+
+/// Price alert log entry
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct PriceAlertLog {
+    pub id: i64,
+    pub alert_id: Option<i64>,
+    pub user_id: i64,
+    pub product_id: i64,
+    pub old_price: i32,
+    pub new_price: i32,
+    pub change_percent: f64,
+    pub likely_cause: String,
+    pub sent_at: DateTime<Utc>,
+    pub delivered: bool,
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 

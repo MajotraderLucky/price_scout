@@ -2052,3 +2052,297 @@ impl Database {
         Ok(result.rows_affected() > 0)
     }
 }
+
+// ============================================================================
+// PRICE ALERT OPERATIONS (PS-47)
+// ============================================================================
+
+impl Database {
+    /// Subscribe user to price alerts for a product
+    ///
+    /// Uses SQL function to capture baseline price and currency rates.
+    /// Automatically re-enables if already subscribed but disabled.
+    ///
+    /// # Arguments
+    /// * `user_id` - User's database ID
+    /// * `product_id` - Product to track
+    /// * `source` - Source of subscription ('search', 'price', 'trends', 'compare', 'manual')
+    /// * `alert_type` - Type of alert ('any_drop', 'target_price', 'percent_drop')
+    /// * `target_price` - Target price for 'target_price' type (optional)
+    /// * `min_drop_percent` - Minimum drop percentage to trigger alert
+    ///
+    /// # Returns
+    /// Alert subscription ID
+    pub async fn subscribe_to_price_alert(
+        &self,
+        user_id: i64,
+        product_id: i64,
+        source: &str,
+        alert_type: Option<&str>,
+        target_price: Option<i32>,
+        min_drop_percent: Option<f64>,
+    ) -> Result<i64> {
+        let alert_type = alert_type.unwrap_or("any_drop");
+        let min_drop_percent = min_drop_percent.unwrap_or(5.0);
+
+        let id = sqlx::query_scalar::<_, i64>(
+            "SELECT subscribe_to_price_alert($1, $2, $3, $4, $5, $6)",
+        )
+        .bind(user_id)
+        .bind(product_id)
+        .bind(source)
+        .bind(alert_type)
+        .bind(target_price)
+        .bind(min_drop_percent)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to subscribe to price alert")?;
+
+        Ok(id)
+    }
+
+    /// Unsubscribe user from price alerts for a product
+    ///
+    /// Sets enabled=false instead of deleting to preserve history.
+    ///
+    /// # Returns
+    /// true if alert was found and disabled
+    pub async fn unsubscribe_from_price_alert(
+        &self,
+        user_id: i64,
+        product_id: i64,
+    ) -> Result<bool> {
+        let result = sqlx::query(
+            r#"
+            UPDATE user_price_alerts
+            SET enabled = false, updated_at = NOW()
+            WHERE user_id = $1 AND product_id = $2
+            "#,
+        )
+        .bind(user_id)
+        .bind(product_id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to unsubscribe from price alert")?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Get all active alerts that need checking
+    ///
+    /// Returns alerts that are enabled, not recently alerted,
+    /// and belong to users with notifications enabled.
+    ///
+    /// # Arguments
+    /// * `min_interval_hours` - Minimum hours between alerts for same product
+    ///
+    /// # Returns
+    /// Vector of alerts to check
+    pub async fn get_alerts_to_check(
+        &self,
+        min_interval_hours: i32,
+    ) -> Result<Vec<AlertToCheck>> {
+        let alerts = sqlx::query_as::<_, AlertToCheck>(
+            "SELECT * FROM get_alerts_to_check($1)",
+        )
+        .bind(min_interval_hours)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch alerts to check")?;
+
+        Ok(alerts)
+    }
+
+    /// Get current minimum price for a product
+    pub async fn get_product_min_price(&self, product_id: i64) -> Result<Option<i32>> {
+        let price = sqlx::query_scalar::<_, i32>(
+            "SELECT get_product_min_price($1)",
+        )
+        .bind(product_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get product min price")?;
+
+        Ok(price)
+    }
+
+    /// Analyze price change cause using currency correlation
+    ///
+    /// # Returns
+    /// PriceChangeAnalysis with cause determination
+    pub async fn analyze_price_change(
+        &self,
+        old_price: i32,
+        new_price: i32,
+        old_usd: Option<f64>,
+        new_usd: Option<f64>,
+        old_eur: Option<f64>,
+        new_eur: Option<f64>,
+    ) -> Result<PriceChangeAnalysis> {
+        // Calculate price change
+        let change_percent = if old_price > 0 {
+            ((new_price as f64 - old_price as f64) / old_price as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Get cause from SQL function
+        let likely_cause: String = sqlx::query_scalar(
+            "SELECT analyze_price_change_cause($1, $2, $3, $4, $5, $6)",
+        )
+        .bind(old_price)
+        .bind(new_price)
+        .bind(old_usd)
+        .bind(new_usd)
+        .bind(old_eur)
+        .bind(new_eur)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to analyze price change cause")?;
+
+        // Calculate currency changes
+        let currency_usd_change = match (old_usd, new_usd) {
+            (Some(old), Some(new)) if old > 0.0 => Some(((new - old) / old) * 100.0),
+            _ => None,
+        };
+
+        let currency_eur_change = match (old_eur, new_eur) {
+            (Some(old), Some(new)) if old > 0.0 => Some(((new - old) / old) * 100.0),
+            _ => None,
+        };
+
+        Ok(PriceChangeAnalysis {
+            old_price,
+            new_price,
+            change_percent,
+            currency_usd_change,
+            currency_eur_change,
+            likely_cause,
+        })
+    }
+
+    /// Get current currency rates
+    pub async fn get_current_currency_rates(&self) -> Result<(Option<f64>, Option<f64>)> {
+        let usd = sqlx::query_scalar::<_, f64>(
+            r#"
+            SELECT rate_to_rub FROM currency_rates
+            WHERE currency_code = 'USD'
+            ORDER BY recorded_at DESC LIMIT 1
+            "#,
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get USD rate")?;
+
+        let eur = sqlx::query_scalar::<_, f64>(
+            r#"
+            SELECT rate_to_rub FROM currency_rates
+            WHERE currency_code = 'EUR'
+            ORDER BY recorded_at DESC LIMIT 1
+            "#,
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get EUR rate")?;
+
+        Ok((usd, eur))
+    }
+
+    /// Record sent price alert
+    ///
+    /// Updates alert record and logs to history.
+    pub async fn record_price_alert_sent(
+        &self,
+        alert_id: i64,
+        old_price: i32,
+        new_price: i32,
+        likely_cause: &str,
+    ) -> Result<()> {
+        sqlx::query("SELECT record_price_alert_sent($1, $2, $3, $4)")
+            .bind(alert_id)
+            .bind(old_price)
+            .bind(new_price)
+            .bind(likely_cause)
+            .execute(&self.pool)
+            .await
+            .context("Failed to record price alert sent")?;
+
+        Ok(())
+    }
+
+    /// Get user's price alert subscriptions
+    pub async fn get_user_price_alerts(&self, user_id: i64) -> Result<Vec<UserPriceAlert>> {
+        let alerts = sqlx::query_as::<_, UserPriceAlert>(
+            r#"
+            SELECT * FROM user_price_alerts
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch user price alerts")?;
+
+        Ok(alerts)
+    }
+
+    /// Get price alert history for a user
+    pub async fn get_price_alert_history(
+        &self,
+        user_id: i64,
+        limit: i32,
+    ) -> Result<Vec<PriceAlertLog>> {
+        let history = sqlx::query_as::<_, PriceAlertLog>(
+            r#"
+            SELECT * FROM price_alert_log
+            WHERE user_id = $1
+            ORDER BY sent_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch price alert history")?;
+
+        Ok(history)
+    }
+
+    /// Get product name by ID
+    pub async fn get_product_name(&self, product_id: i64) -> Result<Option<String>> {
+        let name = sqlx::query_scalar::<_, String>(
+            "SELECT name FROM products WHERE id = $1",
+        )
+        .bind(product_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get product name")?;
+
+        Ok(name)
+    }
+
+    /// Get store name for the cheapest price of a product
+    pub async fn get_cheapest_store_for_product(
+        &self,
+        product_id: i64,
+    ) -> Result<Option<(String, i32)>> {
+        let result = sqlx::query_as::<_, (String, i32)>(
+            r#"
+            SELECT s.name, sp.price
+            FROM store_prices sp
+            JOIN stores s ON sp.store_id = s.id
+            WHERE sp.product_id = $1 AND sp.available = true
+            ORDER BY sp.price ASC
+            LIMIT 1
+            "#,
+        )
+        .bind(product_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get cheapest store")?;
+
+        Ok(result)
+    }
+}

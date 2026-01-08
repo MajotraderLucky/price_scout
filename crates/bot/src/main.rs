@@ -22,6 +22,7 @@
 //! - /track <product_id> <target_price> - Track product (future)
 
 mod notifications;
+mod price_alerts;
 
 use anyhow::{Context, Result};
 use price_scout_db::Database;
@@ -249,6 +250,14 @@ async fn main() -> Result<()> {
         notifications::daily_report_scheduler(bot_for_daily, db_for_daily).await;
     });
     info!("✅ Daily report scheduler started (09:00 MSK)");
+
+    // Start price alert checker in background
+    let bot_for_alerts = bot.clone();
+    let db_for_alerts = db.clone();
+    tokio::spawn(async move {
+        price_alerts::price_alert_loop(bot_for_alerts, db_for_alerts).await;
+    });
+    info!("✅ Price alert checker started (every 30 min)");
 
     info!("🚀 Bot is running...");
 
@@ -521,6 +530,32 @@ async fn handle_callback(bot: Bot, q: CallbackQuery, db: Database) -> ResponseRe
                         bot.send_message(chat_id, "😕 ML модель недоступна. Используйте /predict для прогноза.")
                             .await?;
                     }
+                }
+            }
+        }
+        // Unsubscribe from price alerts
+        _ if data.starts_with("unsub_") => {
+            if let Ok(product_id) = data[6..].parse::<i64>() {
+                log_command_async(&db, user_id, "unsub", Some(&product_id.to_string())).await;
+                if let Some(uid) = user_id {
+                    match price_alerts::unsubscribe(&db, uid, product_id).await {
+                        Ok(true) => {
+                            bot.send_message(chat_id, "[+] Вы отписались от уведомлений о снижении цены.")
+                                .await?;
+                        }
+                        Ok(false) => {
+                            bot.send_message(chat_id, "[i] Подписка не найдена.")
+                                .await?;
+                        }
+                        Err(e) => {
+                            error!("Failed to unsubscribe: {:#}", e);
+                            bot.send_message(chat_id, "[X] Ошибка отписки. Попробуйте позже.")
+                                .await?;
+                        }
+                    }
+                } else {
+                    bot.send_message(chat_id, "[X] Не удалось определить пользователя.")
+                        .await?;
                 }
             }
         }
@@ -826,6 +861,15 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                         bot.send_message(chat_id, format!("😕 Ничего не найдено по запросу: {}", query))
                             .await?;
                     } else {
+                        // Auto-subscribe to first 3 products (PS-47)
+                        if let Some(telegram_id) = user_id {
+                            if let Ok(Some(user)) = db.get_user_by_telegram_id(telegram_id).await {
+                                for product in products.iter().take(3) {
+                                    let _ = price_alerts::auto_subscribe(&db, user.id, product.id, "search").await;
+                                }
+                            }
+                        }
+
                         let response = format_search_results(&products);
                         bot.send_message(chat_id, response)
                             .parse_mode(ParseMode::Html)
@@ -852,6 +896,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                         Ok(Some(product)) => {
                             match db.get_best_prices(product_id, 10).await {
                                 Ok(prices) => {
+                                    // Auto-subscribe to this product (PS-47)
+                                    if let Some(telegram_id) = user_id {
+                                        if let Ok(Some(user)) = db.get_user_by_telegram_id(telegram_id).await {
+                                            let _ = price_alerts::auto_subscribe(&db, user.id, product_id, "price").await;
+                                        }
+                                    }
+
                                     // Fetch store names for each price
                                     let mut price_data = Vec::new();
                                     for price in prices {
@@ -920,6 +971,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                                 bot.send_message(chat_id, format!("😕 История цен не найдена для товара {}", product_id))
                                     .await?;
                             } else {
+                                // Auto-subscribe to this product (PS-47)
+                                if let Some(telegram_id) = user_id {
+                                    if let Ok(Some(user)) = db.get_user_by_telegram_id(telegram_id).await {
+                                        let _ = price_alerts::auto_subscribe(&db, user.id, product_id, "trends").await;
+                                    }
+                                }
+
                                 let response = format_price_trends(product_id, &trends);
                                 bot.send_message(chat_id, response)
                                     .parse_mode(ParseMode::Html)
@@ -1013,6 +1071,13 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                                 bot.send_message(chat_id, format!("😕 Данные о магазинах не найдены для товара {}", product_id))
                                     .await?;
                             } else {
+                                // Auto-subscribe to this product (PS-47)
+                                if let Some(telegram_id) = user_id {
+                                    if let Ok(Some(user)) = db.get_user_by_telegram_id(telegram_id).await {
+                                        let _ = price_alerts::auto_subscribe(&db, user.id, product_id, "compare").await;
+                                    }
+                                }
+
                                 let response = format_store_comparison(product_id, &stores);
                                 bot.send_message(chat_id, response)
                                     .parse_mode(ParseMode::Html)
