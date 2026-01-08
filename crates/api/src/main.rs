@@ -47,11 +47,14 @@ use axum::{
     extract::{Path, Query, State},
     http::{header, Method, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use price_scout_db::Database;
-use price_scout_models::{CommandUsage, MarketStats as ModelMarketStats, Product, Store, StorePrice, StoreRanking, SystemStats, UserStats};
+use price_scout_models::{
+    CommandUsage, MarketStats as ModelMarketStats, NewStore, Product, Store,
+    StoreHealthStats, StorePrice, StoreRanking, SystemStats, UpdateStore, UserStats,
+};
 use price_scout_scraper::{JobStats, ScraperQueue};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -433,12 +436,15 @@ async fn main() -> anyhow::Result<()> {
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST])
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([header::CONTENT_TYPE]);
 
     let app = Router::new()
         .route("/health", get(health_check))
-        .route("/api/stores", get(get_stores))
+        // Store management endpoints
+        .route("/api/stores", get(get_stores).post(create_store))
+        .route("/api/stores/:id", get(get_store_by_id).put(update_store).delete(delete_store))
+        .route("/api/stores/health", get(get_stores_health))
         .route("/api/products/:id", get(get_product))
         .route("/api/products/:id/prices", get(get_product_prices))
         .route("/api/search", post(search_products))
@@ -474,6 +480,11 @@ async fn main() -> anyhow::Result<()> {
     info!("📋 Available endpoints:");
     info!("   GET  /health");
     info!("   GET  /api/stores");
+    info!("   POST /api/stores");
+    info!("   GET  /api/stores/:id");
+    info!("   PUT  /api/stores/:id");
+    info!("   DEL  /api/stores/:id");
+    info!("   GET  /api/stores/health");
     info!("   GET  /api/products/:id");
     info!("   GET  /api/products/:id/prices");
     info!("   POST /api/search");
@@ -510,6 +521,63 @@ async fn health_check() -> &'static str {
 async fn get_stores(State(state): State<AppState>) -> Result<Json<Vec<Store>>, ApiError> {
     let stores = state.db.get_stable_stores().await?;
     Ok(Json(stores))
+}
+
+/// Get store by ID
+async fn get_store_by_id(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<Json<Store>, ApiError> {
+    let store = state.db.get_store(id).await?;
+    Ok(Json(store))
+}
+
+/// Create new store
+async fn create_store(
+    State(state): State<AppState>,
+    Json(new_store): Json<NewStore>,
+) -> Result<Json<StoreCreatedResponse>, ApiError> {
+    let id = state.db.create_store(&new_store).await?;
+    Ok(Json(StoreCreatedResponse { id, name: new_store.name }))
+}
+
+#[derive(Serialize)]
+struct StoreCreatedResponse {
+    id: i32,
+    name: String,
+}
+
+/// Update store
+async fn update_store(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    Json(update): Json<UpdateStore>,
+) -> Result<Json<SuccessResponse>, ApiError> {
+    state.db.update_store(id, &update).await?;
+    Ok(Json(SuccessResponse { success: true, message: "Store updated".to_string() }))
+}
+
+#[derive(Serialize)]
+struct SuccessResponse {
+    success: bool,
+    message: String,
+}
+
+/// Delete (disable) store
+async fn delete_store(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<Json<SuccessResponse>, ApiError> {
+    state.db.disable_store(id).await?;
+    Ok(Json(SuccessResponse { success: true, message: "Store disabled".to_string() }))
+}
+
+/// Get store health statistics
+async fn get_stores_health(
+    State(state): State<AppState>,
+) -> Result<Json<StoreHealthStats>, ApiError> {
+    let stats = state.db.get_store_health_stats().await?;
+    Ok(Json(stats))
 }
 
 async fn get_product(

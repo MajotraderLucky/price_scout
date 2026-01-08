@@ -23,6 +23,7 @@ pub struct User {
 // STORE MODELS
 // ============================================================================
 
+/// Store with extended fields for management
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct Store {
     pub id: i32,
@@ -32,6 +33,101 @@ pub struct Store {
     pub parser: String,
     pub unstable: bool,
     pub created_at: DateTime<Utc>,
+    // New fields from migration 007
+    #[sqlx(default)]
+    pub source: Option<String>,
+    #[sqlx(default)]
+    pub last_success_at: Option<DateTime<Utc>>,
+    #[sqlx(default)]
+    pub failure_count: Option<i32>,
+    #[sqlx(default)]
+    pub last_failure_at: Option<DateTime<Utc>>,
+    #[sqlx(default)]
+    pub enabled: Option<bool>,
+    #[sqlx(default)]
+    pub priority: Option<i32>,
+    #[sqlx(default)]
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// Request to create a new store
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewStore {
+    pub name: String,
+    pub base_url: String,
+    pub method: String,
+    pub parser: String,
+    #[serde(default)]
+    pub unstable: bool,
+    #[serde(default = "default_source")]
+    pub source: String,
+    #[serde(default = "default_priority")]
+    pub priority: i32,
+}
+
+fn default_source() -> String {
+    "manual".to_string()
+}
+
+fn default_priority() -> i32 {
+    50
+}
+
+/// Request to update a store
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UpdateStore {
+    pub name: Option<String>,
+    pub base_url: Option<String>,
+    pub method: Option<String>,
+    pub parser: Option<String>,
+    pub unstable: Option<bool>,
+    pub enabled: Option<bool>,
+    pub priority: Option<i32>,
+}
+
+/// Store source enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StoreSource {
+    Migration,
+    Manual,
+    AutoImport,
+}
+
+impl StoreSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Migration => "migration",
+            Self::Manual => "manual",
+            Self::AutoImport => "auto_import",
+        }
+    }
+}
+
+/// Store health statistics
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct StoreHealthStats {
+    pub total_stores: i64,
+    pub enabled_stores: i64,
+    pub healthy_stores: i64,
+    pub unhealthy_stores: i64,
+    pub critical_stores: i64,
+    pub disabled_stores: i64,
+}
+
+/// Store candidate for auto-import
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct StoreCandidate {
+    pub id: i64,
+    pub domain: String,
+    pub base_url: String,
+    pub sample_urls: Vec<String>,
+    pub price_extractions: i32,
+    pub successful_extractions: i32,
+    pub first_seen_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+    pub status: String,
+    pub promoted_to_store_id: Option<i32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,6 +140,8 @@ pub enum StoreMethod {
     CitilinkFirefox,
     AvitoFirefox,
     YandexMarketSpecial,
+    GenericHttp,
+    GenericPlaywright,
 }
 
 impl StoreMethod {
@@ -56,6 +154,8 @@ impl StoreMethod {
             Self::CitilinkFirefox => "citilink_firefox",
             Self::AvitoFirefox => "avito_firefox",
             Self::YandexMarketSpecial => "yandex_market_special",
+            Self::GenericHttp => "generic_http",
+            Self::GenericPlaywright => "generic_playwright",
         }
     }
 }

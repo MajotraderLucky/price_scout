@@ -102,6 +102,192 @@ impl Database {
 
         Ok(store)
     }
+
+    /// Get enabled stores (enabled=true)
+    pub async fn get_enabled_stores(&self) -> Result<Vec<Store>> {
+        let stores = sqlx::query_as::<_, Store>(
+            "SELECT * FROM stores WHERE enabled = true ORDER BY priority DESC, id",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch enabled stores")?;
+
+        Ok(stores)
+    }
+
+    /// Find store by domain (partial match)
+    pub async fn find_store_by_domain(&self, domain: &str) -> Result<Option<Store>> {
+        let store = sqlx::query_as::<_, Store>(
+            "SELECT * FROM stores WHERE base_url ILIKE '%' || $1 || '%' LIMIT 1",
+        )
+        .bind(domain)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to find store by domain")?;
+
+        Ok(store)
+    }
+
+    /// Create new store
+    pub async fn create_store(&self, store: &NewStore) -> Result<i32> {
+        let id = sqlx::query_scalar::<_, i32>(
+            r#"
+            INSERT INTO stores (name, base_url, method, parser, unstable, source, priority)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id
+            "#,
+        )
+        .bind(&store.name)
+        .bind(&store.base_url)
+        .bind(&store.method)
+        .bind(&store.parser)
+        .bind(store.unstable)
+        .bind(&store.source)
+        .bind(store.priority)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to create store")?;
+
+        Ok(id)
+    }
+
+    /// Update store
+    pub async fn update_store(&self, id: i32, update: &UpdateStore) -> Result<()> {
+        let mut query = String::from("UPDATE stores SET updated_at = NOW()");
+        let mut param_count = 0;
+
+        if update.name.is_some() {
+            param_count += 1;
+            query.push_str(&format!(", name = ${}", param_count));
+        }
+        if update.base_url.is_some() {
+            param_count += 1;
+            query.push_str(&format!(", base_url = ${}", param_count));
+        }
+        if update.method.is_some() {
+            param_count += 1;
+            query.push_str(&format!(", method = ${}", param_count));
+        }
+        if update.parser.is_some() {
+            param_count += 1;
+            query.push_str(&format!(", parser = ${}", param_count));
+        }
+        if update.unstable.is_some() {
+            param_count += 1;
+            query.push_str(&format!(", unstable = ${}", param_count));
+        }
+        if update.enabled.is_some() {
+            param_count += 1;
+            query.push_str(&format!(", enabled = ${}", param_count));
+        }
+        if update.priority.is_some() {
+            param_count += 1;
+            query.push_str(&format!(", priority = ${}", param_count));
+        }
+
+        param_count += 1;
+        query.push_str(&format!(" WHERE id = ${}", param_count));
+
+        let mut q = sqlx::query(&query);
+
+        if let Some(ref name) = update.name {
+            q = q.bind(name);
+        }
+        if let Some(ref base_url) = update.base_url {
+            q = q.bind(base_url);
+        }
+        if let Some(ref method) = update.method {
+            q = q.bind(method);
+        }
+        if let Some(ref parser) = update.parser {
+            q = q.bind(parser);
+        }
+        if let Some(unstable) = update.unstable {
+            q = q.bind(unstable);
+        }
+        if let Some(enabled) = update.enabled {
+            q = q.bind(enabled);
+        }
+        if let Some(priority) = update.priority {
+            q = q.bind(priority);
+        }
+
+        q.bind(id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to update store")?;
+
+        Ok(())
+    }
+
+    /// Update store health after scraping attempt
+    pub async fn update_store_health(&self, id: i32, success: bool) -> Result<()> {
+        if success {
+            sqlx::query(
+                r#"
+                UPDATE stores
+                SET last_success_at = NOW(),
+                    failure_count = 0,
+                    updated_at = NOW()
+                WHERE id = $1
+                "#,
+            )
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to update store health (success)")?;
+        } else {
+            sqlx::query(
+                r#"
+                UPDATE stores
+                SET last_failure_at = NOW(),
+                    failure_count = failure_count + 1,
+                    updated_at = NOW()
+                WHERE id = $1
+                "#,
+            )
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to update store health (failure)")?;
+        }
+
+        Ok(())
+    }
+
+    /// Disable store (soft delete)
+    pub async fn disable_store(&self, id: i32) -> Result<()> {
+        sqlx::query("UPDATE stores SET enabled = false, updated_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to disable store")?;
+
+        Ok(())
+    }
+
+    /// Delete store (hard delete)
+    pub async fn delete_store(&self, id: i32) -> Result<()> {
+        sqlx::query("DELETE FROM stores WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to delete store")?;
+
+        Ok(())
+    }
+
+    /// Get store health statistics
+    pub async fn get_store_health_stats(&self) -> Result<StoreHealthStats> {
+        let stats = sqlx::query_as::<_, StoreHealthStats>(
+            "SELECT * FROM get_store_health_stats()",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to get store health stats")?;
+
+        Ok(stats)
+    }
 }
 
 // ============================================================================
