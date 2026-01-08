@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-08 (PS-47 Smart Price Alerts)
+> Последнее обновление: 2026-01-08 (PS-48 Web Search Filtering)
 
 ---
 
@@ -27,6 +27,7 @@
 
 | ID    | Задача                                 | Дата       | Результат                                         |
 |-------|----------------------------------------|------------|---------------------------------------------------|
+| PS-48 | Фильтрация веб-поиска                  | 2026-01-08 | Category URL filter, relevance check, RU stemming |
 | PS-47 | Умные ценовые алерты                   | 2026-01-08 | Auto-subscribe, currency analysis, Telegram notif |
 | PS-46 | Система аналитики магазинов (Complete) | 2026-01-08 | 4 phases: CRUD, AutoImport, Arbitrage, Cleanup    |
 | PS-45 | Улучшить веб-поиск (извлечение цен)    | 2026-01-08 | Playwright + DuckDuckGo integration               |
@@ -114,11 +115,11 @@
 | Метрика           | Значение         |
 |-------------------|------------------|
 | Фаза              | Phase 4 Complete |
-| Статус            | PS-47 Complete   |
+| Статус            | PS-48 Complete   |
 | Задач в Backlog   | 2                |
 | Задач In Progress | 0                |
 | Задач в Review    | 0                |
-| Задач Done        | 32               |
+| Задач Done        | 33               |
 | Python скриптов   | 29               |
 | Rust modules      | 11               |
 | Bot commands      | 11               |
@@ -130,9 +131,16 @@
 
 ## Current Focus
 
-**Статус: PS-47 SMART PRICE ALERTS COMPLETE!**
+**Статус: PS-48 WEB SEARCH FILTERING COMPLETE!**
 
-**Новые возможности (PS-47):**
+**Новые возможности (PS-48):**
+- [+] Category URL Filter: Фильтрация /category/, /catalog/, /product-category/
+- [+] Marketplace Detection: Ozon, Wildberries, YMarket категории всегда фильтруются
+- [+] Relevance Check: Проверка ключевых слов запроса в результатах
+- [+] Russian Stemming: Простой стемминг (рогатка -> рогатки)
+- [+] Stop Words: Фильтрация стоп-слов для русского языка
+
+**Возможности (PS-47):**
 - [+] Smart Price Alerts: Автоматические уведомления о падении цен
 - [+] Currency Correlation: Анализ причины изменения (валюта vs рынок)
 - [+] Auto-Subscribe: Подписка при /search, /price, /trends, /compare
@@ -233,6 +241,7 @@
 
 | Дата       | Изменение                                                         |
 |------------|-------------------------------------------------------------------|
+| 2026-01-08 | PS-48: Web Search Filtering - category URLs, relevance, stemming  |
 | 2026-01-08 | PS-47: Smart Price Alerts - auto-subscribe, currency analysis     |
 | 2026-01-08 | PS-46 Phase 4: Store Auto-Cleanup - daily timer, health functions |
 | 2026-01-08 | PS-46 Phase 3: Arbitrage Analytics - SQL functions, migration 008 |
@@ -289,6 +298,53 @@
 ---
 
 ## Описание задач
+
+### PS-48: Web Search Filtering (фильтрация поиска)
+
+**Статус:** Complete (2026-01-08)
+
+**Проблема:**
+При поиске товара через `/web` бот возвращал нерелевантные результаты:
+- URL категорий (`/product-category/rogatki/`) показывали цены других товаров
+- Маркетплейсы возвращали страницы каталогов вместо товаров
+- Результаты не соответствовали запросу
+
+**Реализовано:**
+
+| Компонент               | Описание                                             |
+|-------------------------|------------------------------------------------------|
+| is_category_url()       | Детекция URL категорий (/category/, /catalog/, etc.) |
+| CATEGORY_PATTERNS       | 11 паттернов для фильтрации                          |
+| is_relevant_result()    | Проверка ключевых слов запроса в результате          |
+| get_word_stem()         | Простой русский стемминг для склонений               |
+| keyword_matches()       | Поиск с учётом стемминга                             |
+| STOP_WORDS              | Русские стоп-слова (с, и, в, на, для...)             |
+
+**Алгоритм фильтрации:**
+
+```
+1. URL категорий:
+   - Паттерн /category/, /catalog/ найден?
+   - Для Ozon/Wildberries/YMarket - всегда категория
+   - Один сегмент после паттерна = категория
+   - Короткий последний сегмент = категория
+
+2. Релевантность:
+   - Извлечь ключевые слова из запроса (без стоп-слов)
+   - Применить стемминг (рогатка -> рогат)
+   - Проверить наличие в title/snippet
+   - Минимум 1 совпадение (или 40% для длинных запросов)
+```
+
+**Результат:**
+- archerclub.ru/product-category/rogatki/ - отфильтрован [+]
+- ozon.ru/category/rogatki-11596/ - отфильтрован [+]
+- tempgun.ru/.../rogatka_centershot_hammer/ - проходит [+]
+
+**Файлы:**
+- scripts/web_search.py (+149 строк)
+
+---
 
 ### PS-47: Smart Price Alerts (ценовые алерты)
 
