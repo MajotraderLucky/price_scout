@@ -56,6 +56,24 @@ AGGREGATORS = {
     "nadavi.ru",
 }
 
+# URL patterns that indicate category/catalog pages (not product pages)
+CATEGORY_PATTERNS = [
+    '/category/',
+    '/categories/',
+    '/catalog/',
+    '/product-category/',
+    '/collection/',
+    '/collections/',
+    '/tag/',
+    '/tags/',
+    '/search/',
+    '/search?',
+    '/brands/',
+]
+
+# Russian stop words for relevance checking
+STOP_WORDS = {'с', 'и', 'в', 'на', 'для', 'по', 'от', 'до', 'из', 'к', 'у', 'о', 'а', 'но', 'не', 'это', 'как', 'что'}
+
 # Known shops with their display names
 KNOWN_SHOPS = {
     # Major marketplaces
@@ -89,6 +107,129 @@ KNOWN_SHOPS = {
     "goods.ru": "goods.ru",
     "sbermegamarket.ru": "СберМегаМаркет",
 }
+
+
+def is_category_url(url: str) -> bool:
+    """
+    Check if URL is a category/catalog page, not a product page.
+
+    Category pages contain patterns like /category/, /catalog/, etc.
+    Returns True if URL is likely a category/listing page.
+    """
+    try:
+        parsed = urlparse(url)
+        path = parsed.path.lower().rstrip('/')
+        domain = parsed.netloc.lower()
+
+        # Major marketplaces: /category/ is ALWAYS a category page
+        major_marketplaces = ['ozon.ru', 'wildberries.ru', 'market.yandex.ru', 'aliexpress']
+        if any(mp in domain for mp in major_marketplaces):
+            if '/category/' in path or '/catalog/' in path:
+                return True
+
+        for pattern in CATEGORY_PATTERNS:
+            pattern_clean = pattern.rstrip('/')
+            if pattern_clean in path:
+                idx = path.find(pattern_clean)
+                after = path[idx + len(pattern_clean):]
+
+                # Nothing after pattern - definitely a category
+                if not after or after == '/':
+                    return True
+
+                # Remove leading slash and check what's left
+                after = after.lstrip('/')
+                if not after:
+                    return True
+
+                # Count remaining segments
+                segments = [s for s in after.split('/') if s]
+
+                # If only one segment - likely a category name (even with ID like rogatki-11596)
+                if len(segments) == 1:
+                    return True
+
+                # If two+ segments but second is short - still likely a subcategory
+                if len(segments) >= 2:
+                    # Product pages usually have long descriptive slugs
+                    # Categories have short names
+                    last_seg = segments[-1]
+                    if len(last_seg) < 20 and '-' not in last_seg:
+                        return True
+
+        return False
+    except Exception:
+        return False
+
+
+def extract_keywords(query: str) -> list:
+    """Extract meaningful keywords from query (without stop words)."""
+    words = re.findall(r'[а-яёa-z0-9]+', query.lower())
+    return [w for w in words if w not in STOP_WORDS and len(w) > 2]
+
+
+def get_word_stem(word: str) -> str:
+    """
+    Simple Russian stemming - truncate common endings.
+
+    This is a primitive approach that works for basic matching.
+    Returns stem of at least 4 characters for Russian words.
+    """
+    if len(word) <= 4:
+        return word
+
+    # Common Russian noun/adjective endings to strip
+    endings = ['ами', 'ями', 'ах', 'ях', 'ой', 'ей', 'ом', 'ем',
+               'ов', 'ев', 'ий', 'ый', 'ая', 'яя', 'ое', 'ее',
+               'ие', 'ые', 'ок', 'ек', 'ка', 'ки', 'ку', 'ке']
+
+    for ending in endings:
+        if word.endswith(ending) and len(word) - len(ending) >= 4:
+            return word[:-len(ending)]
+
+    # Fallback: return first 4-6 chars for long Russian words
+    if len(word) > 6 and re.match(r'^[а-яё]+$', word):
+        return word[:-2]
+
+    return word
+
+
+def keyword_matches(keyword: str, text: str) -> bool:
+    """
+    Check if keyword matches anywhere in text.
+
+    Uses stem matching for Russian words to handle declension.
+    """
+    # Direct match
+    if keyword in text:
+        return True
+
+    # Stem-based match for Russian words
+    if re.match(r'^[а-яё]+$', keyword) and len(keyword) > 4:
+        stem = get_word_stem(keyword)
+        if stem in text:
+            return True
+
+    return False
+
+
+def is_relevant_result(query: str, title: str, snippet: str) -> bool:
+    """
+    Check if search result is relevant to query.
+
+    Requires at least 40% of query keywords to be present in title/snippet.
+    Uses stem matching for Russian words.
+    """
+    keywords = extract_keywords(query)
+    if not keywords:
+        return True  # No keywords to check - accept result
+
+    text = (title + " " + snippet).lower()
+    matches = sum(1 for kw in keywords if keyword_matches(kw, text))
+
+    # Require at least 40% keyword match (min 1, rounded down)
+    # int() ensures 4 keywords * 0.4 = 1 (not 1.6)
+    return matches >= max(1, int(len(keywords) * 0.4))
 
 
 def extract_prices(text: str) -> list:
@@ -169,6 +310,14 @@ def search_prices(query: str, max_results: int = 20, fetch_real_prices: bool = T
             # Skip aggregators and price comparison sites
             is_aggregator = any(agg in domain for agg in AGGREGATORS)
             if is_aggregator:
+                continue
+
+            # Skip category/catalog pages (PS-48)
+            if is_category_url(url):
+                continue
+
+            # Skip irrelevant results (PS-48)
+            if not is_relevant_result(query, title, snippet):
                 continue
 
             # Deduplicate by base domain (krasnoyarsk.tempgun.ru -> tempgun.ru)
