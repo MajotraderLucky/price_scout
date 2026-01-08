@@ -21,6 +21,13 @@
 //! - `GET /api/arbitrage?min_profit=10` - Find arbitrage opportunities (price differences across stores)
 //! - `GET /api/analytics/predictions/:id` - Get ML-based price prediction for product (7-day forecast)
 //!
+//! ### Enhanced Arbitrage Analytics (PS-46 Phase 3)
+//! - `GET /api/analytics/arbitrage/trends?days=7` - Market-wide arbitrage trends
+//! - `GET /api/analytics/arbitrage/best-products?days=7&limit=10` - Best products for arbitrage
+//! - `GET /api/analytics/arbitrage/alerts` - High-margin alerts (>20% profit)
+//! - `GET /api/analytics/arbitrage/store-pairs` - Store pair performance
+//! - `GET /api/analytics/arbitrage/history/:id?days=30` - Product arbitrage history
+//!
 //! ### Market Research Endpoints
 //! - `GET /api/market-research/top-100?limit=100` - Get top 100 popular products by score
 //! - `GET /api/market-research/popular-queries?limit=50` - Get popular search queries
@@ -47,7 +54,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{header, Method, StatusCode},
     response::{IntoResponse, Response},
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Json, Router,
 };
 use price_scout_db::Database;
@@ -456,6 +463,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/analytics/market-overview", get(get_market_overview))
         .route("/api/arbitrage", get(get_arbitrage_opportunities))
         .route("/api/analytics/predictions/:id", get(get_price_prediction))
+        // Enhanced Arbitrage Analytics (PS-46 Phase 3)
+        .route("/api/analytics/arbitrage/trends", get(get_arbitrage_trends))
+        .route("/api/analytics/arbitrage/best-products", get(get_best_arbitrage_products))
+        .route("/api/analytics/arbitrage/alerts", get(get_arbitrage_alerts))
+        .route("/api/analytics/arbitrage/store-pairs", get(get_store_pair_arbitrage))
+        .route("/api/analytics/arbitrage/history/:id", get(get_arbitrage_history))
         // Market Research endpoints
         .route("/api/market-research/top-100", get(get_top_products))
         .route("/api/market-research/popular-queries", get(get_popular_queries))
@@ -496,6 +509,11 @@ async fn main() -> anyhow::Result<()> {
     info!("   GET  /api/analytics/market-overview");
     info!("   GET  /api/arbitrage");
     info!("   GET  /api/analytics/predictions/:id");
+    info!("   GET  /api/analytics/arbitrage/trends");
+    info!("   GET  /api/analytics/arbitrage/best-products");
+    info!("   GET  /api/analytics/arbitrage/alerts");
+    info!("   GET  /api/analytics/arbitrage/store-pairs");
+    info!("   GET  /api/analytics/arbitrage/history/:id");
     info!("   GET  /api/market-research/top-100");
     info!("   GET  /api/market-research/popular-queries");
     info!("   GET  /api/market-research/categories");
@@ -979,4 +997,274 @@ async fn get_stats_commands(
     let commands = state.db.get_command_usage(query.days).await?;
     let count = commands.len();
     Ok(Json(StatsCommandsResponse { commands, count }))
+}
+
+// ============================================================================
+// ENHANCED ARBITRAGE ANALYTICS HANDLERS (PS-46 Phase 3)
+// ============================================================================
+
+/// Query parameters for arbitrage trends
+#[derive(Debug, Deserialize)]
+struct ArbitrageTrendsQuery {
+    #[serde(default = "default_arb_days")]
+    days: i32,
+}
+
+fn default_arb_days() -> i32 {
+    7
+}
+
+/// Arbitrage trends response
+#[derive(Debug, Serialize)]
+struct ArbitrageTrendsResponse {
+    trends: Vec<ArbitrageTrendEntry>,
+    count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct ArbitrageTrendEntry {
+    date: String,
+    total_opportunities: i64,
+    avg_profit_percent: f64,
+    max_profit_percent: f64,
+    unique_products: i64,
+    total_profit_potential_rub: i32,
+}
+
+/// Get market-wide arbitrage trends
+async fn get_arbitrage_trends(
+    State(state): State<AppState>,
+    Query(query): Query<ArbitrageTrendsQuery>,
+) -> Result<Json<ArbitrageTrendsResponse>, ApiError> {
+    let trends = state.db.get_arbitrage_trends(query.days).await?;
+
+    let entries: Vec<ArbitrageTrendEntry> = trends
+        .into_iter()
+        .map(|t| ArbitrageTrendEntry {
+            date: t.trend_date.to_string(),
+            total_opportunities: t.total_opportunities,
+            avg_profit_percent: t.avg_profit_percent,
+            max_profit_percent: t.max_profit_percent,
+            unique_products: t.unique_products,
+            total_profit_potential_rub: (t.total_profit_potential / 100) as i32,
+        })
+        .collect();
+
+    let count = entries.len();
+
+    Ok(Json(ArbitrageTrendsResponse {
+        trends: entries,
+        count,
+    }))
+}
+
+/// Query parameters for best arbitrage products
+#[derive(Debug, Deserialize)]
+struct BestArbitrageQuery {
+    #[serde(default = "default_arb_days")]
+    days: i32,
+    #[serde(default = "default_limit_10")]
+    limit: i32,
+}
+
+fn default_limit_10() -> i32 {
+    10
+}
+
+/// Best arbitrage products response
+#[derive(Debug, Serialize)]
+struct BestArbitrageProductsResponse {
+    products: Vec<BestArbitrageEntry>,
+    count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct BestArbitrageEntry {
+    product_id: i64,
+    product_name: String,
+    category: Option<String>,
+    opportunity_count: i64,
+    avg_profit_percent: f64,
+    max_profit_percent: f64,
+    last_opportunity_at: String,
+}
+
+/// Get best products for arbitrage
+async fn get_best_arbitrage_products(
+    State(state): State<AppState>,
+    Query(query): Query<BestArbitrageQuery>,
+) -> Result<Json<BestArbitrageProductsResponse>, ApiError> {
+    let products = state.db.get_best_arbitrage_products(query.days, query.limit).await?;
+
+    let entries: Vec<BestArbitrageEntry> = products
+        .into_iter()
+        .map(|p| BestArbitrageEntry {
+            product_id: p.product_id,
+            product_name: p.product_name,
+            category: p.category,
+            opportunity_count: p.opportunity_count,
+            avg_profit_percent: p.avg_profit_percent,
+            max_profit_percent: p.max_profit_percent,
+            last_opportunity_at: p.last_opportunity_at.to_rfc3339(),
+        })
+        .collect();
+
+    let count = entries.len();
+
+    Ok(Json(BestArbitrageProductsResponse {
+        products: entries,
+        count,
+    }))
+}
+
+/// High-margin alerts response
+#[derive(Debug, Serialize)]
+struct ArbitrageAlertsResponse {
+    alerts: Vec<ArbitrageAlertEntry>,
+    count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct ArbitrageAlertEntry {
+    product_id: i64,
+    product_name: String,
+    category: Option<String>,
+    buy_store: String,
+    buy_price_rub: i32,
+    sell_store: String,
+    sell_price_rub: i32,
+    profit_rub: i32,
+    profit_percent: f64,
+    last_updated: String,
+}
+
+/// Get high-margin alerts (>20% profit)
+async fn get_arbitrage_alerts(
+    State(state): State<AppState>,
+) -> Result<Json<ArbitrageAlertsResponse>, ApiError> {
+    let alerts = state.db.get_high_margin_alerts().await?;
+
+    let entries: Vec<ArbitrageAlertEntry> = alerts
+        .into_iter()
+        .map(|a| ArbitrageAlertEntry {
+            product_id: a.product_id,
+            product_name: a.product_name,
+            category: a.category,
+            buy_store: a.buy_store,
+            buy_price_rub: a.buy_price / 100,
+            sell_store: a.sell_store,
+            sell_price_rub: a.sell_price / 100,
+            profit_rub: a.profit_kopecks / 100,
+            profit_percent: a.profit_percent,
+            last_updated: a.last_updated.to_rfc3339(),
+        })
+        .collect();
+
+    let count = entries.len();
+
+    Ok(Json(ArbitrageAlertsResponse {
+        alerts: entries,
+        count,
+    }))
+}
+
+/// Store pair arbitrage response
+#[derive(Debug, Serialize)]
+struct StorePairArbitrageResponse {
+    pairs: Vec<StorePairEntry>,
+    count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct StorePairEntry {
+    buy_store: String,
+    sell_store: String,
+    opportunity_count: i64,
+    avg_profit_percent: f64,
+    total_profit_potential_rub: i32,
+}
+
+/// Get store pair arbitrage performance
+async fn get_store_pair_arbitrage(
+    State(state): State<AppState>,
+) -> Result<Json<StorePairArbitrageResponse>, ApiError> {
+    let pairs = state.db.get_store_pair_arbitrage().await?;
+
+    let entries: Vec<StorePairEntry> = pairs
+        .into_iter()
+        .map(|p| StorePairEntry {
+            buy_store: p.buy_store,
+            sell_store: p.sell_store,
+            opportunity_count: p.opportunity_count,
+            avg_profit_percent: p.avg_profit_percent,
+            total_profit_potential_rub: (p.total_profit_potential / 100) as i32,
+        })
+        .collect();
+
+    let count = entries.len();
+
+    Ok(Json(StorePairArbitrageResponse {
+        pairs: entries,
+        count,
+    }))
+}
+
+/// Arbitrage history query
+#[derive(Debug, Deserialize)]
+struct ArbitrageHistoryQuery {
+    #[serde(default = "default_days_30")]
+    days: i32,
+}
+
+fn default_days_30() -> i32 {
+    30
+}
+
+/// Arbitrage history response
+#[derive(Debug, Serialize)]
+struct ArbitrageHistoryResponse {
+    product_id: i64,
+    history: Vec<ArbitrageHistoryEntry>,
+    count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct ArbitrageHistoryEntry {
+    date: String,
+    avg_profit_percent: f64,
+    max_profit_percent: f64,
+    min_profit_percent: f64,
+    opportunity_count: i64,
+    best_buy_store: Option<String>,
+    best_sell_store: Option<String>,
+}
+
+/// Get arbitrage history for a specific product
+async fn get_arbitrage_history(
+    State(state): State<AppState>,
+    Path(product_id): Path<i64>,
+    Query(query): Query<ArbitrageHistoryQuery>,
+) -> Result<Json<ArbitrageHistoryResponse>, ApiError> {
+    let history = state.db.get_arbitrage_history(product_id, query.days).await?;
+
+    let entries: Vec<ArbitrageHistoryEntry> = history
+        .into_iter()
+        .map(|h| ArbitrageHistoryEntry {
+            date: h.detected_date.to_string(),
+            avg_profit_percent: h.avg_profit_percent,
+            max_profit_percent: h.max_profit_percent,
+            min_profit_percent: h.min_profit_percent,
+            opportunity_count: h.opportunity_count,
+            best_buy_store: h.best_buy_store,
+            best_sell_store: h.best_sell_store,
+        })
+        .collect();
+
+    let count = entries.len();
+
+    Ok(Json(ArbitrageHistoryResponse {
+        product_id,
+        history: entries,
+        count,
+    }))
 }

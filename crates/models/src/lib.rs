@@ -597,6 +597,151 @@ pub struct CommandLog {
 }
 
 // ============================================================================
+// ARBITRAGE ANALYTICS MODELS (PS-46 Phase 3)
+// ============================================================================
+
+/// Historical arbitrage record
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct ArbitrageHistory {
+    pub id: i64,
+    pub product_id: i64,
+    pub buy_store_id: i32,
+    pub buy_price: i32,
+    pub sell_store_id: i32,
+    pub sell_price: i32,
+    pub profit_kopecks: i32,
+    pub profit_percent: f64,
+    pub detected_at: DateTime<Utc>,
+}
+
+impl ArbitrageHistory {
+    /// Buy price in rubles
+    pub fn buy_price_rub(&self) -> f64 {
+        self.buy_price as f64 / 100.0
+    }
+
+    /// Sell price in rubles
+    pub fn sell_price_rub(&self) -> f64 {
+        self.sell_price as f64 / 100.0
+    }
+
+    /// Profit in rubles
+    pub fn profit_rub(&self) -> f64 {
+        self.profit_kopecks as f64 / 100.0
+    }
+}
+
+/// Arbitrage history aggregated by date (from SQL function)
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct ArbitrageHistoryDaily {
+    pub detected_date: chrono::NaiveDate,
+    pub avg_profit_percent: f64,
+    pub max_profit_percent: f64,
+    pub min_profit_percent: f64,
+    pub opportunity_count: i64,
+    pub best_buy_store: Option<String>,
+    pub best_sell_store: Option<String>,
+}
+
+/// Market-wide arbitrage trends (from SQL function)
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct ArbitrageTrend {
+    pub trend_date: chrono::NaiveDate,
+    pub total_opportunities: i64,
+    pub avg_profit_percent: f64,
+    pub max_profit_percent: f64,
+    pub unique_products: i64,
+    pub total_profit_potential: i64,
+}
+
+impl ArbitrageTrend {
+    /// Total profit potential in rubles
+    pub fn total_profit_potential_rub(&self) -> f64 {
+        self.total_profit_potential as f64 / 100.0
+    }
+}
+
+/// Best arbitrage products (from SQL function)
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct BestArbitrageProduct {
+    pub product_id: i64,
+    pub product_name: String,
+    pub category: Option<String>,
+    pub opportunity_count: i64,
+    pub avg_profit_percent: f64,
+    pub max_profit_percent: f64,
+    pub last_opportunity_at: DateTime<Utc>,
+}
+
+/// User's arbitrage alert configuration
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct ArbitrageAlert {
+    pub id: i64,
+    pub user_id: i64,
+    pub min_profit_percent: f64,
+    pub product_id: Option<i64>,
+    pub category: Option<String>,
+    pub enabled: bool,
+    pub last_triggered_at: Option<DateTime<Utc>>,
+    pub trigger_count: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// User's arbitrage watchlist entry
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct ArbitrageWatchlist {
+    pub id: i64,
+    pub user_id: i64,
+    pub product_id: i64,
+    pub min_profit_percent: f64,
+    pub notify_on_opportunity: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// High-margin alert from v_arbitrage_alerts view
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct ArbitrageAlertView {
+    pub product_id: i64,
+    pub product_name: String,
+    pub category: Option<String>,
+    pub buy_store: String,
+    pub buy_price: i32,
+    pub sell_store: String,
+    pub sell_price: i32,
+    pub profit_kopecks: i32,
+    pub profit_percent: f64,
+    pub last_updated: DateTime<Utc>,
+}
+
+impl ArbitrageAlertView {
+    /// Buy price in rubles
+    pub fn buy_price_rub(&self) -> f64 {
+        self.buy_price as f64 / 100.0
+    }
+
+    /// Sell price in rubles
+    pub fn sell_price_rub(&self) -> f64 {
+        self.sell_price as f64 / 100.0
+    }
+
+    /// Profit in rubles
+    pub fn profit_rub(&self) -> f64 {
+        self.profit_kopecks as f64 / 100.0
+    }
+}
+
+/// Store pair performance for arbitrage
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct StorePairArbitrage {
+    pub buy_store: String,
+    pub sell_store: String,
+    pub opportunity_count: i64,
+    pub avg_profit_percent: f64,
+    pub total_profit_potential: i64,
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 

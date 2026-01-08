@@ -4,12 +4,12 @@
 
 use anyhow::{Context, Result};
 use serde_json;
-use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 struct TestResponse {
     store: String,
     status: String,

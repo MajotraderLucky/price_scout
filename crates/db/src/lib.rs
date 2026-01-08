@@ -1780,3 +1780,275 @@ impl Database {
         })
     }
 }
+
+// ============================================================================
+// ARBITRAGE ANALYTICS OPERATIONS (PS-46 Phase 3)
+// ============================================================================
+
+impl Database {
+    /// Record arbitrage snapshot (calls SQL function)
+    ///
+    /// Takes a snapshot of current arbitrage opportunities for historical tracking.
+    /// Should be called periodically (e.g., hourly) by a scheduler.
+    ///
+    /// # Arguments
+    /// * `min_profit_percent` - Minimum profit percentage to record (default: 5.0)
+    ///
+    /// # Returns
+    /// Number of opportunities recorded
+    pub async fn record_arbitrage_snapshot(&self, min_profit_percent: f64) -> Result<i32> {
+        let count = sqlx::query_scalar::<_, i32>(
+            "SELECT record_arbitrage_snapshot($1)",
+        )
+        .bind(min_profit_percent)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to record arbitrage snapshot")?;
+
+        Ok(count)
+    }
+
+    /// Get arbitrage history for a specific product
+    ///
+    /// Returns daily aggregated arbitrage data for trend analysis.
+    ///
+    /// # Arguments
+    /// * `product_id` - Product to analyze
+    /// * `days` - Number of days to look back
+    ///
+    /// # Returns
+    /// Vector of daily arbitrage history records
+    pub async fn get_arbitrage_history(
+        &self,
+        product_id: i64,
+        days: i32,
+    ) -> Result<Vec<ArbitrageHistoryDaily>> {
+        let history = sqlx::query_as::<_, ArbitrageHistoryDaily>(
+            "SELECT * FROM get_arbitrage_history($1, $2)",
+        )
+        .bind(product_id)
+        .bind(days)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch arbitrage history")?;
+
+        Ok(history)
+    }
+
+    /// Get market-wide arbitrage trends
+    ///
+    /// Returns daily aggregated statistics for all arbitrage opportunities.
+    ///
+    /// # Arguments
+    /// * `days` - Number of days to analyze
+    ///
+    /// # Returns
+    /// Vector of daily trend data
+    pub async fn get_arbitrage_trends(&self, days: i32) -> Result<Vec<ArbitrageTrend>> {
+        let trends = sqlx::query_as::<_, ArbitrageTrend>(
+            "SELECT * FROM get_arbitrage_trends($1)",
+        )
+        .bind(days)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch arbitrage trends")?;
+
+        Ok(trends)
+    }
+
+    /// Get best products for arbitrage
+    ///
+    /// Returns products with the most frequent arbitrage opportunities.
+    ///
+    /// # Arguments
+    /// * `days` - Number of days to analyze
+    /// * `limit` - Maximum number of products to return
+    ///
+    /// # Returns
+    /// Vector of best arbitrage products
+    pub async fn get_best_arbitrage_products(
+        &self,
+        days: i32,
+        limit: i32,
+    ) -> Result<Vec<BestArbitrageProduct>> {
+        let products = sqlx::query_as::<_, BestArbitrageProduct>(
+            "SELECT * FROM get_best_arbitrage_products($1, $2)",
+        )
+        .bind(days)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch best arbitrage products")?;
+
+        Ok(products)
+    }
+
+    /// Get high-margin alerts (>20% profit)
+    ///
+    /// Returns current arbitrage opportunities with high profit margins.
+    ///
+    /// # Returns
+    /// Vector of high-margin alert entries
+    pub async fn get_high_margin_alerts(&self) -> Result<Vec<ArbitrageAlertView>> {
+        let alerts = sqlx::query_as::<_, ArbitrageAlertView>(
+            "SELECT * FROM v_arbitrage_alerts ORDER BY profit_percent DESC LIMIT 50",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch high-margin alerts")?;
+
+        Ok(alerts)
+    }
+
+    /// Get store pair arbitrage performance
+    ///
+    /// Returns statistics on which store pairs have the best arbitrage potential.
+    ///
+    /// # Returns
+    /// Vector of store pair performance data
+    pub async fn get_store_pair_arbitrage(&self) -> Result<Vec<StorePairArbitrage>> {
+        let pairs = sqlx::query_as::<_, StorePairArbitrage>(
+            "SELECT * FROM v_store_pair_arbitrage ORDER BY avg_profit_percent DESC LIMIT 20",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch store pair arbitrage")?;
+
+        Ok(pairs)
+    }
+
+    /// Add product to user's arbitrage watchlist
+    ///
+    /// # Arguments
+    /// * `user_id` - User's database ID
+    /// * `product_id` - Product to watch
+    /// * `min_profit_percent` - Minimum profit threshold for notifications
+    ///
+    /// # Returns
+    /// Watchlist entry ID
+    pub async fn add_to_arbitrage_watchlist(
+        &self,
+        user_id: i64,
+        product_id: i64,
+        min_profit_percent: f64,
+    ) -> Result<i64> {
+        let id = sqlx::query_scalar::<_, i64>(
+            r#"
+            INSERT INTO arbitrage_watchlist (user_id, product_id, min_profit_percent)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, product_id)
+            DO UPDATE SET min_profit_percent = EXCLUDED.min_profit_percent
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(product_id)
+        .bind(min_profit_percent)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to add to arbitrage watchlist")?;
+
+        Ok(id)
+    }
+
+    /// Remove product from user's arbitrage watchlist
+    pub async fn remove_from_arbitrage_watchlist(
+        &self,
+        user_id: i64,
+        product_id: i64,
+    ) -> Result<bool> {
+        let result = sqlx::query(
+            "DELETE FROM arbitrage_watchlist WHERE user_id = $1 AND product_id = $2",
+        )
+        .bind(user_id)
+        .bind(product_id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to remove from arbitrage watchlist")?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Get user's arbitrage watchlist
+    pub async fn get_user_arbitrage_watchlist(
+        &self,
+        user_id: i64,
+    ) -> Result<Vec<ArbitrageWatchlist>> {
+        let watchlist = sqlx::query_as::<_, ArbitrageWatchlist>(
+            "SELECT * FROM arbitrage_watchlist WHERE user_id = $1 ORDER BY created_at DESC",
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch arbitrage watchlist")?;
+
+        Ok(watchlist)
+    }
+
+    /// Set user's arbitrage alert threshold
+    ///
+    /// # Arguments
+    /// * `user_id` - User's database ID
+    /// * `min_profit_percent` - Minimum profit percentage for alerts
+    /// * `product_id` - Optional product filter (None = all products)
+    /// * `category` - Optional category filter
+    ///
+    /// # Returns
+    /// Alert configuration ID
+    pub async fn set_arbitrage_alert(
+        &self,
+        user_id: i64,
+        min_profit_percent: f64,
+        product_id: Option<i64>,
+        category: Option<&str>,
+    ) -> Result<i64> {
+        let id = sqlx::query_scalar::<_, i64>(
+            r#"
+            INSERT INTO arbitrage_alerts (user_id, min_profit_percent, product_id, category)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, product_id)
+            DO UPDATE SET
+                min_profit_percent = EXCLUDED.min_profit_percent,
+                category = EXCLUDED.category,
+                updated_at = NOW()
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(min_profit_percent)
+        .bind(product_id)
+        .bind(category)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to set arbitrage alert")?;
+
+        Ok(id)
+    }
+
+    /// Get user's arbitrage alert configurations
+    pub async fn get_user_arbitrage_alerts(&self, user_id: i64) -> Result<Vec<ArbitrageAlert>> {
+        let alerts = sqlx::query_as::<_, ArbitrageAlert>(
+            "SELECT * FROM arbitrage_alerts WHERE user_id = $1 AND enabled = true ORDER BY created_at DESC",
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch arbitrage alerts")?;
+
+        Ok(alerts)
+    }
+
+    /// Delete user's arbitrage alert
+    pub async fn delete_arbitrage_alert(&self, user_id: i64, alert_id: i64) -> Result<bool> {
+        let result = sqlx::query(
+            "DELETE FROM arbitrage_alerts WHERE id = $1 AND user_id = $2",
+        )
+        .bind(alert_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to delete arbitrage alert")?;
+
+        Ok(result.rows_affected() > 0)
+    }
+}
