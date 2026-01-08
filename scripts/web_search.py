@@ -33,6 +33,18 @@ except ImportError:
     SUPPORTED_STORES = set()
     pass  # Will use snippet prices only
 
+# Try to import store_discovery for candidate tracking
+STORE_DISCOVERY_AVAILABLE = False
+_discovery = None
+try:
+    import os
+    from store_discovery import StoreDiscovery
+    _db_url = os.environ.get("DATABASE_URL", "postgresql://postgres@localhost:5432/price_scout")
+    _discovery = StoreDiscovery(_db_url)
+    STORE_DISCOVERY_AVAILABLE = True
+except ImportError:
+    pass  # No candidate tracking
+
 
 # Aggregators and price comparison sites (not real shops - exclude from results)
 AGGREGATORS = {
@@ -116,7 +128,7 @@ def get_base_domain(domain: str) -> str:
     return domain
 
 
-def search_prices(query: str, max_results: int = 20, fetch_real_prices: bool = True) -> dict:
+def search_prices(query: str, max_results: int = 20, fetch_real_prices: bool = True, track_candidates: bool = True) -> dict:
     """
     Search for prices using DuckDuckGo.
 
@@ -124,6 +136,7 @@ def search_prices(query: str, max_results: int = 20, fetch_real_prices: bool = T
         query: Search query
         max_results: Maximum number of results
         fetch_real_prices: If True, fetch real prices from known stores using Playwright
+        track_candidates: If True, track unknown stores with prices as candidates for auto-import
 
     Returns:
         Dict with query, results, and error
@@ -133,6 +146,7 @@ def search_prices(query: str, max_results: int = 20, fetch_real_prices: bool = T
         "results": [],
         "error": None,
         "verified_count": 0,
+        "candidates_tracked": 0,
     }
     seen_domains = set()  # For deduplication
 
@@ -208,6 +222,25 @@ def search_prices(query: str, max_results: int = 20, fetch_real_prices: bool = T
                     # Keep snippet prices on error
                     result["fetch_error"] = str(e)
 
+        # Track store candidates for auto-import
+        if track_candidates and STORE_DISCOVERY_AVAILABLE and _discovery:
+            for result in results["results"]:
+                domain = result["domain"]
+                url = result["url"]
+                has_prices = bool(result.get("prices"))
+
+                # Skip known stores and shops without prices
+                is_known_store = result.get("shop") is not None
+                is_supported = any(store in domain for store in SUPPORTED_STORES)
+
+                if not is_known_store and not is_supported and has_prices:
+                    try:
+                        candidate_id = _discovery.track_candidate(domain, url, price_found=True)
+                        if candidate_id:
+                            results["candidates_tracked"] += 1
+                    except Exception:
+                        pass  # Don't fail search due to tracking errors
+
     except Exception as e:
         results["error"] = str(e)
 
@@ -251,14 +284,20 @@ def main():
         action="store_true",
         help="Disable real price fetching (faster, snippet prices only)"
     )
+    parser.add_argument(
+        "--no-track-candidates",
+        action="store_true",
+        help="Disable tracking store candidates for auto-import"
+    )
 
     args = parser.parse_args()
 
     # Determine if we should fetch real prices
     fetch_prices = args.fetch_prices and not args.no_fetch_prices
+    track_candidates = not args.no_track_candidates
 
     if args.command == "search":
-        result = search_prices(args.query, args.max_results, fetch_real_prices=fetch_prices)
+        result = search_prices(args.query, args.max_results, fetch_real_prices=fetch_prices, track_candidates=track_candidates)
 
         if args.output == "pretty":
             print(json.dumps(result, ensure_ascii=False, indent=2))

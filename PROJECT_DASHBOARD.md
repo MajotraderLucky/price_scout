@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-08 (PS-46 Store Analytics System)
+> Последнее обновление: 2026-01-08 (PS-46 Phase 2 Auto-Import Complete)
 
 ---
 
@@ -100,6 +100,9 @@
 | dns_scraper.sh              | DNS Firefox + xdotool (archbook)      | [+] Working |
 | dns_api_scraper.py          | DNS API scraper (catalog JSON)        | [+] Working |
 | test_scrapers.py            | Unified test system (all methods)     | [+] Working |
+| store_discovery.py          | Auto-import store candidates          | [+] Working |
+| web_search.py               | DuckDuckGo price search + tracking    | [+] Working |
+| store_parsers.py            | Playwright price extraction           | [+] Working |
 | citilink_playwright.py      | Citilink Playwright + delay scraper   | [+] Working |
 | citilink_scraper.sh         | Citilink Firefox + xdotool (backup)   | [!] Limited |
 
@@ -115,7 +118,7 @@
 | Задач In Progress | 1                |
 | Задач в Review    | 0                |
 | Задач Done        | 30               |
-| Python скриптов   | 25               |
+| Python скриптов   | 28               |
 | Rust modules      | 10               |
 | Bot commands      | 11               |
 | Документов        | 20               |
@@ -222,6 +225,9 @@
 
 | Дата       | Изменение                                                         |
 |------------|-------------------------------------------------------------------|
+| 2026-01-08 | PS-46 Phase 2: Auto-Import - store_discovery.py, web_search track |
+| 2026-01-08 | PS-46 Phase 1: CRUD API - migrations, stores endpoint, health     |
+| 2026-01-08 | PS-45: Web Search Price Extraction - Playwright + DuckDuckGo      |
 | 2026-01-07 | PS-44: Currency Auto-Collection - systemd timer daily 12:00 MSK   |
 | 2026-01-07 | PS-43: Bot UX - inline keyboards for all messages, product lists  |
 | 2026-01-07 | PS-42: Analytics - /stats command, command logging, daily reports |
@@ -272,6 +278,68 @@
 ---
 
 ## Описание задач
+
+### PS-46: Store Analytics System (арбитраж)
+
+**Статус:** In Progress (Phase 2 Complete)
+
+**Цель:** Система аналитики до 100 магазинов с автоимпортом и арбитражем.
+
+**Прогресс:**
+
+| Phase   | Описание                        | Статус      |
+|---------|---------------------------------|-------------|
+| Phase 1 | CRUD API для магазинов          | [+] Done    |
+| Phase 2 | Автоимпорт из веб-поиска        | [+] Done    |
+| Phase 3 | Аналитика арбитража             | [ ] Pending |
+| Phase 4 | Автоочистка неактивных          | [ ] Pending |
+
+**Phase 1 - CRUD API (Complete):**
+- [+] Migration 007_store_management.sql - расширение stores, store_candidates
+- [+] Rust модели: NewStore, UpdateStore, StoreHealthStats, StoreCandidate
+- [+] DB операции: create/update/delete store, health tracking
+- [+] API endpoints: /api/stores, /api/stores/:id, /api/stores/health
+
+**Phase 2 - Auto-Import (Complete):**
+- [+] scripts/store_discovery.py - модуль обнаружения магазинов
+  - track_candidate() - трекинг кандидатов из поиска
+  - validate_candidate() - валидация 4/5 тестов
+  - promote_to_store() - продвижение в полноценный магазин
+- [+] scripts/web_search.py - интеграция трекинга
+  - Автоматический трекинг неизвестных доменов с ценами
+  - Blacklist для агрегаторов и форумов
+- [+] Deployed и протестировано на archbook
+
+**Workflow автоимпорта:**
+```
+Web Search → Price Found → Unknown Domain → Track Candidate
+    ↓                                              ↓
+3+ успешных извлечений               →        Testing Phase
+    ↓                                              ↓
+4/5 тестов прошли                    →        Promote to Store
+```
+
+**Текущие кандидаты:**
+```
+store_candidates:
+  total: 1
+  candidates: 1
+  testing: 0
+  promoted: 0
+  rejected: 0
+```
+
+**Файлы:**
+- migrations/007_store_management.sql
+- scripts/store_discovery.py
+- scripts/web_search.py (updated)
+- crates/db/src/lib.rs (store CRUD)
+- crates/api/src/main.rs (stores endpoints)
+- crates/models/src/lib.rs (new models)
+
+**План:** [~/.claude/plans/snuggly-floating-minsky.md]
+
+---
 
 ### PS-44: Currency Auto-Collection
 
