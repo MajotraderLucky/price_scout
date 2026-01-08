@@ -3,11 +3,13 @@
 Web Search API for Price Scout Bot
 
 DuckDuckGo-based price search with JSON output for Rust integration.
+Now with real price extraction from known stores using Playwright.
 
 Usage:
     python3 web_search.py search --query "рогатка centershot" --max-results 10
+    python3 web_search.py search --query "рогатка centershot" --fetch-prices  # Extract real prices
 
-Output: JSON with search results including prices extracted from snippets.
+Output: JSON with search results including prices extracted from snippets or pages.
 """
 
 import argparse
@@ -21,6 +23,15 @@ try:
 except ImportError:
     print(json.dumps({"query": "", "results": [], "error": "duckduckgo-search not installed"}))
     sys.exit(1)
+
+# Try to import store_parsers for real price extraction
+STORE_PARSERS_AVAILABLE = False
+try:
+    from store_parsers import fetch_price, SUPPORTED_STORES, extract_domain
+    STORE_PARSERS_AVAILABLE = True
+except ImportError:
+    SUPPORTED_STORES = set()
+    pass  # Will use snippet prices only
 
 
 # Aggregators and price comparison sites (not real shops - exclude from results)
@@ -105,22 +116,31 @@ def get_base_domain(domain: str) -> str:
     return domain
 
 
-def search_prices(query: str, max_results: int = 20) -> dict:
-    """Search for prices using DuckDuckGo."""
+def search_prices(query: str, max_results: int = 20, fetch_real_prices: bool = True) -> dict:
+    """
+    Search for prices using DuckDuckGo.
+
+    Args:
+        query: Search query
+        max_results: Maximum number of results
+        fetch_real_prices: If True, fetch real prices from known stores using Playwright
+
+    Returns:
+        Dict with query, results, and error
+    """
     results = {
         "query": query,
         "results": [],
-        "error": None
+        "error": None,
+        "verified_count": 0,
     }
     seen_domains = set()  # For deduplication
 
     try:
         with DDGS() as ddgs:
-            # Search with Russian locale and price-related keywords
-            search_query = f"купить {query} цена"
+            # Simple search without "купить...цена" - avoids rate limiting
             search_results = list(ddgs.text(
-                search_query,
-                region="ru-ru",
+                query,
                 max_results=max_results
             ))
 
@@ -143,9 +163,10 @@ def search_prices(query: str, max_results: int = 20) -> dict:
                 continue
             seen_domains.add(base_domain)
 
-            # Extract prices from title and snippet
+            # Extract prices from title and snippet (fallback)
             combined_text = f"{title} {snippet}"
             prices = extract_prices(combined_text)
+            verified = False
 
             # Identify shop
             shop_name = None
@@ -160,8 +181,32 @@ def search_prices(query: str, max_results: int = 20) -> dict:
                 "domain": domain,
                 "shop": shop_name,
                 "snippet": snippet[:200] if snippet else "",
-                "prices": prices
+                "prices": prices,
+                "verified": verified,
             })
+
+        # Fetch real prices from known stores (if enabled)
+        if fetch_real_prices and STORE_PARSERS_AVAILABLE:
+            for result in results["results"][:5]:  # Limit to top 5 for speed
+                domain = result["domain"]
+
+                # Check if this store is supported (domain contains store name)
+                store_supported = any(store in domain for store in SUPPORTED_STORES)
+                if not store_supported:
+                    continue
+
+                try:
+                    price_data = fetch_price(result["url"], timeout=30)
+                    if price_data.get("price"):
+                        result["prices"] = [price_data["price"]]
+                        result["verified"] = True
+                        results["verified_count"] += 1
+                    elif price_data.get("error"):
+                        # Log error but keep snippet prices
+                        result["fetch_error"] = price_data["error"]
+                except Exception as e:
+                    # Keep snippet prices on error
+                    result["fetch_error"] = str(e)
 
     except Exception as e:
         results["error"] = str(e)
@@ -195,11 +240,25 @@ def main():
         default="json",
         help="Output format"
     )
+    parser.add_argument(
+        "--fetch-prices",
+        action="store_true",
+        default=True,
+        help="Fetch real prices from known stores using Playwright (default: True)"
+    )
+    parser.add_argument(
+        "--no-fetch-prices",
+        action="store_true",
+        help="Disable real price fetching (faster, snippet prices only)"
+    )
 
     args = parser.parse_args()
 
+    # Determine if we should fetch real prices
+    fetch_prices = args.fetch_prices and not args.no_fetch_prices
+
     if args.command == "search":
-        result = search_prices(args.query, args.max_results)
+        result = search_prices(args.query, args.max_results, fetch_real_prices=fetch_prices)
 
         if args.output == "pretty":
             print(json.dumps(result, ensure_ascii=False, indent=2))
