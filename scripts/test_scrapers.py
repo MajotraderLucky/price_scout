@@ -1821,6 +1821,7 @@ def main():
         print("  --quick            Skip Firefox-based tests (faster)")
         print("  --skip-unstable    Skip stores with rate limiting issues")
         print("  --store=NAME       Test only specific store")
+        print("  --query=TEXT       Search query (default: 'macbook pro 16')")
         print("  --json             Output results as JSON (for Rust bridge)")
         print("")
         return
@@ -1833,12 +1834,15 @@ def main():
     skip_firefox = "--quick" in sys.argv
     skip_unstable = "--skip-unstable" in sys.argv
     store_filter = None
+    query = TEST_ARTICLE  # Default query
 
     for arg in sys.argv[1:]:
         if arg.startswith("--store="):
             store_filter = arg.split("=")[1]
         elif arg == "--store" and sys.argv.index(arg) + 1 < len(sys.argv):
             store_filter = sys.argv[sys.argv.index(arg) + 1]
+        elif arg.startswith("--query="):
+            query = arg.split("=", 1)[1]  # Use split with maxsplit=1 to handle queries with = signs
 
     if not json_mode:
         if skip_firefox:
@@ -1851,12 +1855,12 @@ def main():
         print(f"Stores to test: {len([s for s in STORES if not store_filter or s.name == store_filter])}")
 
     # Запуск тестов
-    results = run_all_tests(TEST_ARTICLE, skip_firefox=skip_firefox, skip_unstable=skip_unstable, store_filter=store_filter, json_mode=json_mode)
+    results = run_all_tests(query, skip_firefox=skip_firefox, skip_unstable=skip_unstable, store_filter=store_filter, json_mode=json_mode)
 
     # Output based on mode
     if json_mode:
         # JSON mode - output only JSON to stdout
-        output_json(results, TEST_ARTICLE)
+        output_json(results, query)
     else:
         # Normal mode - human-readable output
         print_summary(results)

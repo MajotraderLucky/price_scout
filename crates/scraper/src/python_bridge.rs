@@ -94,6 +94,7 @@ pub async fn run_python_scraper(request: ScraperRequest) -> Result<ScraperRespon
     cmd.arg(&script_path)
         .arg("--json")
         .arg(format!("--store={}", request.store))
+        .arg(format!("--query={}", request.query))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
