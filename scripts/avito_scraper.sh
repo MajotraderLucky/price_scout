@@ -32,6 +32,9 @@ cleanup() {
 
 trap cleanup EXIT
 
+# Get absolute path to this script
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+
 # Проверка доступа к X-серверу
 if [ -z "$XVFB_RUNNING" ]; then
     USE_XVFB=0
@@ -43,7 +46,7 @@ if [ -z "$XVFB_RUNNING" ]; then
         if command -v xvfb-run >/dev/null 2>&1; then
             echo "[*] Запуск через Xvfb..."
             export XVFB_RUNNING=1
-            exec xvfb-run -a --server-args="-screen 0 1920x1080x24" "$0" "$@"
+            exec xvfb-run -a --server-args="-screen 0 1920x1080x24" "$SCRIPT_PATH" "$@"
         else
             echo "[!] Xvfb не установлен и нет доступа к дисплею"
             exit 1
@@ -75,7 +78,12 @@ fi
 # Подготовка
 mkdir -p "$OUTPUT_DIR"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-SAFE_QUERY=$(echo "$QUERY" | tr '/' '_' | tr ' ' '_')
+# Create safe filename (replace special chars, limit length)
+if [[ "$QUERY" == http* ]]; then
+    SAFE_QUERY=$(echo "$QUERY" | sed 's/[^a-zA-Z0-9_-]/_/g' | cut -c1-50)
+else
+    SAFE_QUERY=$(echo "$QUERY" | tr '/' '_' | tr ' ' '_')
+fi
 OUTPUT_FILE="$OUTPUT_DIR/${SAFE_QUERY}_${TIMESTAMP}.html"
 JSON_FILE="$OUTPUT_DIR/${SAFE_QUERY}_${TIMESTAMP}.json"
 

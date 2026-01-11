@@ -131,9 +131,9 @@ STORES: List[StoreConfig] = [
     ),
     StoreConfig(
         name="dns",
-        method="playwright_stealth",
+        method="firefox",  # Uses dns_scraper.sh with xvfb
         search_url="https://www.dns-shop.ru/search/?q={query}",
-        unstable=True,  # Strong bot protection - HTTP 401
+        unstable=True,  # Qrator anti-bot protection blocks scraping
     ),
     StoreConfig(
         name="yandex_market",
@@ -144,10 +144,10 @@ STORES: List[StoreConfig] = [
     ),
     StoreConfig(
         name="ozon",
-        method="playwright_stealth",
+        method="ozon_firefox",  # Uses ozon_scraper.sh with xvfb
         search_url="https://www.ozon.ru/search/?text={query}&from_global=true",
         delay=3,
-        unstable=True,  # Strong bot protection - HTTP 403
+        unstable=True,  # Clipboard issues in Xvfb prevent HTML extraction
     ),
     StoreConfig(
         name="avito",
@@ -1175,8 +1175,11 @@ def test_ozon_firefox(store: StoreConfig, query: str) -> TestResult:
         env.pop("DISPLAY", None)
         env.pop("XVFB_RUNNING", None)
 
+        # Construct search URL from query
+        search_url = f"https://www.ozon.ru/search/?text={query.replace(' ', '+')}&from_global=true"
+
         proc = subprocess.run(
-            ["bash", str(script_path), "macbook-pro-16", str(output_dir)],
+            ["bash", str(script_path), search_url, str(output_dir)],
             capture_output=True,
             text=True,
             timeout=FIREFOX_TIMEOUT,
@@ -1249,9 +1252,12 @@ def test_avito_firefox(store: StoreConfig, query: str) -> TestResult:
         env.pop("DISPLAY", None)
         env.pop("XVFB_RUNNING", None)
 
+        # Construct search URL from query
+        search_url = f"https://www.avito.ru/rossiya/noutbuki?q={query.replace(' ', '+')}"
+
         # Запускаем скрипт
         proc = subprocess.run(
-            ["bash", str(script_path), "macbook-pro-16", str(output_dir)],
+            ["bash", str(script_path), search_url, str(output_dir)],
             capture_output=True,
             text=True,
             timeout=FIREFOX_TIMEOUT,
@@ -1327,9 +1333,12 @@ def test_citilink_firefox(store: StoreConfig, query: str) -> TestResult:
         env.pop("DISPLAY", None)
         env.pop("XVFB_RUNNING", None)
 
+        # Construct search URL from query
+        search_url = f"https://www.citilink.ru/search/?text={query.replace(' ', '+')}"
+
         # Запускаем скрипт
         proc = subprocess.run(
-            ["bash", str(script_path), "macbook-pro", str(output_dir)],
+            ["bash", str(script_path), search_url, str(output_dir)],
             capture_output=True,
             text=True,
             timeout=FIREFOX_TIMEOUT,
@@ -1554,9 +1563,12 @@ def test_firefox(store: StoreConfig, query: str) -> TestResult:
         env.pop("DISPLAY", None)
         env.pop("XVFB_RUNNING", None)
 
+        # Construct search URL from query
+        search_url = f"https://www.dns-shop.ru/search/?q={query.replace(' ', '+')}"
+
         # Запускаем скрипт - он сам запустит xvfb-run
         proc = subprocess.run(
-            ["bash", str(script_path), "macbook-pro", str(output_dir)],
+            ["bash", str(script_path), search_url, str(output_dir)],
             capture_output=True,
             text=True,
             timeout=FIREFOX_TIMEOUT,

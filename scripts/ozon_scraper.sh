@@ -27,13 +27,16 @@ cleanup() {
 
 trap cleanup EXIT
 
+# Get absolute path to this script
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+
 # Xvfb check
 if [ -z "$XVFB_RUNNING" ]; then
     if [ -z "$DISPLAY" ]; then
         if command -v xvfb-run >/dev/null 2>&1; then
             echo "[*] Starting via Xvfb..."
             export XVFB_RUNNING=1
-            exec xvfb-run -a --server-args="-screen 0 1920x1080x24" "$0" "$@"
+            exec xvfb-run -a --server-args="-screen 0 1920x1080x24" "$SCRIPT_PATH" "$@"
         else
             echo "[!] Xvfb not installed"
             exit 1
@@ -63,7 +66,12 @@ fi
 
 mkdir -p "$OUTPUT_DIR"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-SAFE_QUERY=$(echo "$QUERY" | tr '/' '_' | tr ' ' '_')
+# Create safe filename (replace special chars, limit length)
+if [[ "$QUERY" == http* ]]; then
+    SAFE_QUERY=$(echo "$QUERY" | sed 's/[^a-zA-Z0-9_-]/_/g' | cut -c1-50)
+else
+    SAFE_QUERY=$(echo "$QUERY" | tr '/' '_' | tr ' ' '_')
+fi
 OUTPUT_FILE="$OUTPUT_DIR/${SAFE_QUERY}_${TIMESTAMP}.html"
 JSON_FILE="$OUTPUT_DIR/${SAFE_QUERY}_${TIMESTAMP}.json"
 
@@ -109,7 +117,7 @@ fi
 # Activate and scroll
 echo "[4] Extracting HTML..."
 xdotool windowactivate --sync "$WINDOW_ID"
-sleep 1
+sleep 2
 
 # Scroll for lazy loading
 echo "    Scrolling..."
@@ -120,16 +128,32 @@ done
 xdotool key Home
 sleep 1
 
-# View Source + Copy
+# View Source (Ctrl+U) opens new tab
+echo "    View Source..."
 xdotool key ctrl+u
-sleep 2
-xdotool key ctrl+a
-sleep 0.3
-xdotool key ctrl+c
-sleep 0.5
+sleep 4
 
-# Save from clipboard
+# Find and activate the source view window
+SOURCE_WIN=$(xdotool search --name "view-source" 2>/dev/null | head -1)
+if [ -n "$SOURCE_WIN" ]; then
+    echo "    Found source view window"
+    xdotool windowactivate --sync "$SOURCE_WIN"
+    sleep 1
+fi
+
+# Select All + Copy
+echo "    Select All + Copy..."
+xdotool key ctrl+a
+sleep 1
+xdotool key ctrl+c
+sleep 1
+
+# Save from clipboard (try both xclip and xsel)
 xclip -selection clipboard -o > "$OUTPUT_FILE" 2>/dev/null || true
+if [ ! -s "$OUTPUT_FILE" ]; then
+    echo "    xclip failed, trying xsel..."
+    xsel --clipboard --output > "$OUTPUT_FILE" 2>/dev/null || true
+fi
 
 if [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
     SIZE=$(stat -c%s "$OUTPUT_FILE")

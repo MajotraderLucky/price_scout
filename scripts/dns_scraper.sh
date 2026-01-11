@@ -9,7 +9,7 @@ set -e
 # Конфигурация
 CATALOG="${1:-macbook-pro}"
 OUTPUT_DIR="${2:-/tmp/dns_scraper}"
-TIMEOUT_LOAD=25
+TIMEOUT_LOAD=35  # Increased for slower pages
 TIMEOUT_SAVE=5
 
 # Каталоги DNS-Shop
@@ -43,6 +43,9 @@ cleanup() {
 # Trap для гарантированного закрытия при любом выходе
 trap cleanup EXIT
 
+# Get absolute path to this script
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+
 # Проверка доступа к X-серверу (только если ещё не в xvfb-run)
 if [ -z "$XVFB_RUNNING" ]; then
     USE_XVFB=0
@@ -54,7 +57,7 @@ if [ -z "$XVFB_RUNNING" ]; then
         if command -v xvfb-run >/dev/null 2>&1; then
             echo "[*] Запуск через Xvfb..."
             export XVFB_RUNNING=1
-            exec xvfb-run -a --server-args="-screen 0 1920x1080x24" "$0" "$@"
+            exec xvfb-run -a --server-args="-screen 0 1920x1080x24" "$SCRIPT_PATH" "$@"
         else
             echo "[!] Xvfb не установлен и нет доступа к дисплею"
             exit 1
@@ -86,8 +89,14 @@ fi
 # Подготовка
 mkdir -p "$OUTPUT_DIR"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-OUTPUT_FILE="$OUTPUT_DIR/${CATALOG}_${TIMESTAMP}.html"
-JSON_FILE="$OUTPUT_DIR/${CATALOG}_${TIMESTAMP}.json"
+# Create safe filename (replace special chars, limit length)
+if [[ "$CATALOG" == http* ]]; then
+    SAFE_NAME=$(echo "$CATALOG" | sed 's/[^a-zA-Z0-9_-]/_/g' | cut -c1-50)
+else
+    SAFE_NAME="$CATALOG"
+fi
+OUTPUT_FILE="$OUTPUT_DIR/${SAFE_NAME}_${TIMESTAMP}.html"
+JSON_FILE="$OUTPUT_DIR/${SAFE_NAME}_${TIMESTAMP}.json"
 
 echo "========================================"
 echo "  DNS-Shop Scraper"
@@ -131,23 +140,53 @@ if [ -z "$WINDOW_ID" ]; then
     exit 1
 fi
 
-# Активация и сохранение через View Source + Clipboard
+# Активация и сохранение
 echo "[4] Извлечение HTML..."
 xdotool windowactivate --sync "$WINDOW_ID"
-sleep 1
-
-# View Source (Ctrl+U)
-xdotool key ctrl+u
 sleep 2
 
-# Select All + Copy (Ctrl+A, Ctrl+C)
-xdotool key ctrl+a
-sleep 0.3
-xdotool key ctrl+c
-sleep 0.5
+# Try method 1: Save Page (Ctrl+S)
+echo "    Saving page with Ctrl+S..."
+xdotool key ctrl+s
+sleep 3
 
-# Сохранение из буфера
-xclip -selection clipboard -o > "$OUTPUT_FILE" 2>/dev/null
+# Type the output filename in save dialog
+echo "    Typing filename..."
+xdotool type --clearmodifiers "$OUTPUT_FILE"
+sleep 1
+xdotool key Return
+sleep 3
+
+# If Ctrl+S didn't work (file empty), try clipboard method
+if [ ! -s "$OUTPUT_FILE" ]; then
+    echo "    Save dialog failed, trying clipboard method..."
+    # Close any open dialog
+    xdotool key Escape
+    sleep 1
+
+    # View Source (Ctrl+U)
+    xdotool key ctrl+u
+    sleep 4
+
+    # Find the new source view window
+    SOURCE_WIN=$(xdotool search --name "view-source" 2>/dev/null | head -1)
+    if [ -n "$SOURCE_WIN" ]; then
+        xdotool windowactivate --sync "$SOURCE_WIN"
+        sleep 1
+    fi
+
+    # Select All + Copy
+    xdotool key ctrl+a
+    sleep 1
+    xdotool key ctrl+c
+    sleep 1
+
+    # Save from clipboard
+    xclip -selection clipboard -o > "$OUTPUT_FILE" 2>/dev/null
+    if [ ! -s "$OUTPUT_FILE" ]; then
+        xsel --clipboard --output > "$OUTPUT_FILE" 2>/dev/null
+    fi
+fi
 
 # Проверка
 if [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
