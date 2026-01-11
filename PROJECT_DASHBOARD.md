@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-08 (PS-48 Web Search Filtering)
+> Последнее обновление: 2026-01-11 (PS-49 Price Display Fix)
 
 ---
 
@@ -27,6 +27,7 @@
 
 | ID    | Задача                                 | Дата       | Результат                                         |
 |-------|----------------------------------------|------------|---------------------------------------------------|
+| PS-49 | Исправление отображения цен            | 2026-01-11 | Убрано /100 в боте, *100 в AliExpress парсере     |
 | PS-48 | Фильтрация веб-поиска                  | 2026-01-08 | Category URL filter, relevance check, RU stemming |
 | PS-47 | Умные ценовые алерты                   | 2026-01-08 | Auto-subscribe, currency analysis, Telegram notif |
 | PS-46 | Система аналитики магазинов (Complete) | 2026-01-08 | 4 phases: CRUD, AutoImport, Arbitrage, Cleanup    |
@@ -71,6 +72,7 @@
 | Документ           | Описание                                    | Путь                                                                   |
 |--------------------|---------------------------------------------|------------------------------------------------------------------------|
 | README             | Обзор проекта                               | [README.md](README.md)                                                 |
+| PS-49 Plan         | План: Исправление отображения цен           | [~/.claude/plans/curious-floating-lecun.md]                            |
 | Market Analysis    | План развития: Анализ рынка и торговля      | [~/.claude/plans/cheerful-bubbling-catmull.md]                         |
 | Learning Path      | Путь обучения парсингу                      | [docs/LEARNING_PATH.md]                                                |
 | API Endpoints      | Результаты диагностики                      | [docs/API_ENDPOINTS.md]                                                |
@@ -115,11 +117,11 @@
 | Метрика           | Значение         |
 |-------------------|------------------|
 | Фаза              | Phase 4 Complete |
-| Статус            | PS-48 Complete   |
+| Статус            | PS-49 Complete   |
 | Задач в Backlog   | 2                |
 | Задач In Progress | 0                |
 | Задач в Review    | 0                |
-| Задач Done        | 33               |
+| Задач Done        | 34               |
 | Python скриптов   | 29               |
 | Rust modules      | 11               |
 | Bot commands      | 11               |
