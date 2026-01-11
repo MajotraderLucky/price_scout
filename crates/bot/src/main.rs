@@ -1290,7 +1290,7 @@ fn format_price_data(product: &Product, price_data: &[(StorePrice, Store)]) -> S
     }
 
     for (price, store) in price_data {
-        let price_rub = price.price as f64 / 100.0;
+        let price_rub = price.price as f64;
         let available = if price.available { "[+]" } else { "[X]" };
 
         response.push_str(&format!(
@@ -1303,7 +1303,7 @@ fn format_price_data(product: &Product, price_data: &[(StorePrice, Store)]) -> S
 
     // Calculate best price
     if let Some((best_price, best_store)) = price_data.first() {
-        let best_price_rub = best_price.price as f64 / 100.0;
+        let best_price_rub = best_price.price as f64;
         response.push_str(&format!(
             "\n[+] <b>Лучшая цена:</b> {:.0} ₽ в {}\n",
             best_price_rub,
@@ -1326,10 +1326,10 @@ fn format_price_trends(product_id: i64, trends: &[(chrono::NaiveDate, f64, i32, 
         return response;
     }
 
-    for (i, (date, avg_price_kopecks, min_kopecks, max_kopecks, _volatility)) in trends.iter().take(7).enumerate() {
-        let avg_price = avg_price_kopecks / 100.0;
-        let min_price = *min_kopecks as f64 / 100.0;
-        let max_price = *max_kopecks as f64 / 100.0;
+    for (i, (date, avg_price_rub, min_rub, max_rub, _volatility)) in trends.iter().take(7).enumerate() {
+        let avg_price = *avg_price_rub;
+        let min_price = *min_rub as f64;
+        let max_price = *max_rub as f64;
 
         response.push_str(&format!(
             "<b>{}</b>: {:.0} ₽ (диапазон: {:.0}-{:.0})\n",
@@ -1341,7 +1341,7 @@ fn format_price_trends(product_id: i64, trends: &[(chrono::NaiveDate, f64, i32, 
 
         if i == 0 && trends.len() > 1 {
             // Calculate trend direction
-            let prev_price = trends[1].1 / 100.0;
+            let prev_price = trends[1].1;
             let change = avg_price - prev_price;
             let change_pct = (change / prev_price) * 100.0;
 
@@ -1362,10 +1362,10 @@ fn format_price_trends(product_id: i64, trends: &[(chrono::NaiveDate, f64, i32, 
 }
 
 fn format_price_prediction(pred: &PricePredictionResponse) -> String {
-    let current = pred.current_price.unwrap_or(0) as f64 / 100.0;
-    let predicted = pred.predicted_price as f64 / 100.0;
-    let lower = pred.lower_bound as f64 / 100.0;
-    let upper = pred.upper_bound as f64 / 100.0;
+    let current = pred.current_price.unwrap_or(0) as f64;
+    let predicted = pred.predicted_price as f64;
+    let lower = pred.lower_bound as f64;
+    let upper = pred.upper_bound as f64;
 
     let change = predicted - current;
     let change_pct = if current > 0.0 {
@@ -1437,12 +1437,12 @@ fn format_arbitrage(opportunities: &[(i64, String, String, i64, String, i32, i64
     response.push_str(&format!("<b>Найдено {} возможностей:</b>\n\n", opportunities.len()));
 
     for (i, opp) in opportunities.iter().take(5).enumerate() {
-        let (_product_id, name, _category, _buy_store_id, buy_store_name, buy_price_kopecks,
-             _sell_store_id, sell_store_name, sell_price_kopecks, profit_kopecks, profit_percent) = opp;
+        let (_product_id, name, _category, _buy_store_id, buy_store_name, buy_price_rub,
+             _sell_store_id, sell_store_name, sell_price_rub, profit_rub, profit_percent) = opp;
 
-        let buy_price = *buy_price_kopecks as f64 / 100.0;
-        let sell_price = *sell_price_kopecks as f64 / 100.0;
-        let profit = *profit_kopecks as f64 / 100.0;
+        let buy_price = *buy_price_rub as f64;
+        let sell_price = *sell_price_rub as f64;
+        let profit = *profit_rub as f64;
 
         response.push_str(&format!(
             "<b>{}. {}</b>\n",
@@ -1482,8 +1482,8 @@ fn format_store_comparison(product_id: i64, stores: &[(String, f64, i64, f64)]) 
         return response;
     }
 
-    for (i, (store_name, avg_price_kopecks, update_count, availability_rate)) in stores.iter().enumerate() {
-        let avg_price = avg_price_kopecks / 100.0;
+    for (i, (store_name, avg_price_rub, update_count, availability_rate)) in stores.iter().enumerate() {
+        let avg_price = *avg_price_rub;
         let availability = (availability_rate * 100.0) as i32;
 
         response.push_str(&format!(
@@ -1572,8 +1572,8 @@ fn format_top_products(products: &[ProductPopularity]) -> String {
 
         // Price range
         let price_range = match (p.min_price, p.max_price) {
-            (Some(min), Some(max)) => format!("{} - {} ₽", min / 100, max / 100),
-            (Some(min), None) => format!("от {} ₽", min / 100),
+            (Some(min), Some(max)) => format!("{} - {} ₽", min, max),
+            (Some(min), None) => format!("от {} ₽", min),
             _ => "—".to_string(),
         };
 

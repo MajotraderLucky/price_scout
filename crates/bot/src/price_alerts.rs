@@ -170,8 +170,8 @@ impl PriceAlertService {
         new_price: i32,
         analysis: &PriceChangeAnalysis,
     ) -> Result<()> {
-        let old_rub = old_price as f64 / 100.0;
-        let new_rub = new_price as f64 / 100.0;
+        let old_rub = old_price as f64;
+        let new_rub = new_price as f64;
 
         // Format store info
         let store_line = match store_info {

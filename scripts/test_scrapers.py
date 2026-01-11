@@ -590,7 +590,7 @@ def parse_aliexpress_runparams(html: str) -> Optional[Dict]:
                     # Extract numeric price from "1,234.56 RUB" or "1234 RUB"
                     price_cleaned = price_str.replace(',', '').replace('RUB', '').replace('\u20BD', '').strip()
                     try:
-                        price_num = int(float(price_cleaned) * 100)  # Convert to kopecks
+                        price_num = int(float(price_cleaned))  # Price in rubles
                         results.append({
                             'name': title,
                             'price': price_num,
@@ -625,14 +625,14 @@ def parse_aliexpress_runparams(html: str) -> Optional[Dict]:
         price_pattern = r'<span[^>]*>(\d+(?:&nbsp;|\s)\d+(?:&nbsp;|\s)*₽)</span>'
         prices_raw = re.findall(price_pattern, html)
 
-        # Clean prices and convert to kopecks
+        # Clean prices (in rubles)
         prices = []
         for price_str in prices_raw:
             # Remove HTML entities and spaces
             clean = price_str.replace('&nbsp;', '').replace(' ', '').replace('₽', '').strip()
             try:
-                price_num = int(clean) * 100  # Convert to kopecks
-                if price_num > 10000:  # Filter out suspiciously low prices (< 100 RUB)
+                price_num = int(clean)  # Price in rubles
+                if price_num > 100:  # Filter out suspiciously low prices (< 100 RUB)
                     prices.append(price_num)
             except ValueError:
                 continue
