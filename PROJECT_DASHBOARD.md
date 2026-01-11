@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-11 (PS-49 Price Display Fix)
+> Последнее обновление: 2026-01-11 (PS-49 Complete + /top fix)
 
 ---
 
@@ -241,61 +241,63 @@
 
 ## Changelog
 
-| Дата       | Изменение                                                         |
-|------------|-------------------------------------------------------------------|
-| 2026-01-08 | PS-48: Web Search Filtering - category URLs, relevance, stemming  |
-| 2026-01-08 | PS-47: Smart Price Alerts - auto-subscribe, currency analysis     |
-| 2026-01-08 | PS-46 Phase 4: Store Auto-Cleanup - daily timer, health functions |
-| 2026-01-08 | PS-46 Phase 3: Arbitrage Analytics - SQL functions, migration 008 |
-| 2026-01-08 | PS-46 Phase 2: Auto-Import - store_discovery.py, web_search track |
-| 2026-01-08 | PS-46 Phase 1: CRUD API - migrations, stores endpoint, health     |
-| 2026-01-08 | PS-45: Web Search Price Extraction - Playwright + DuckDuckGo      |
-| 2026-01-07 | PS-44: Currency Auto-Collection - systemd timer daily 12:00 MSK   |
-| 2026-01-07 | PS-43: Bot UX - inline keyboards for all messages, product lists  |
-| 2026-01-07 | PS-42: Analytics - /stats command, command logging, daily reports |
-| 2026-01-07 | fix: STDDEV type mismatch in get_price_trends (::float8 cast)     |
-| 2026-01-07 | fix: ML predictor SQL (CTE), venv/bin/python, currency_rates      |
-| 2026-01-06 | PS-40: Bot Localization - all UI strings translated to Russian    |
-| 2026-01-06 | PS-30: Bot Notifications - auto-analytics, command footer hints   |
-| 2026-01-06 | Project cleanup: reports moved to docs/reports/, debug files del  |
-| 2026-01-06 | PS-39: Market Research - Top 100, discovery, /top, /web commands  |
-| 2026-01-06 | PS-8: Telegram Bot - teloxide, 10 commands, standalone mode       |
-| 2026-01-05 | PS-38: ML Price Predictions - Random Forest 7-day forecasts       |
-| 2026-01-05 | PS-37: Arbitrage Detector - Price differences across stores       |
-| 2026-01-05 | PS-36: Analytics Dashboard - 6 endpoints (trends, correlation)    |
-| 2026-01-05 | PS-35: Automated Scheduled Scraping - 10-minute intervals         |
-| 2026-01-05 | PS-34: Currency Rates Tracking - Dual sources (CBR + open.er)     |
-| 2026-01-05 | PS-33: AliExpress Russia added - 9th store with fallback parser   |
-| 2026-01-05 | PS-28: API Server - Axum REST API (13 endpoints, analytics ready) |
-| 2026-01-04 | PS-29: Scraper Orchestration - Queue + Worker (1,770 lines)       |
-| 2026-01-04 | PS-23: Python Bridge - Rust-Python subprocess communication       |
-| 2026-01-04 | PS-22: Rust workspace initialized - 5 crates compiled             |
-| 2026-01-04 | PS-21: PostgreSQL schema created - 7 tables, 9 stores             |
-| 2026-01-03 | Citilink rate limiting исправлен! Задержки 90-210s, 24.4s         |
-| 2026-01-03 | Avito работает! Исправлен парсер, 9/9 магазинов, 51,799 RUB       |
-| 2026-01-02 | Ozon добавлен! 75,024 RUB через Firefox, 8/9 магазинов            |
-| 2026-01-02 | Yandex Market добавлен! 287,891 RUB, 7/8 магазинов работают       |
-| 2026-01-02 | ALL TESTS PASSED! 6/6 unified test, все методы работают           |
-| 2026-01-02 | test_scrapers.py: citilink_special + firefox xvfb fix             |
-| 2026-01-02 | Citilink работает! Playwright + delay, 10 моделей                 |
-| 2026-01-02 | Добавлен nix.ru (129,563 RUB), 7/7 магазинов работают             |
-| 2026-01-02 | DNS-Shop работает! Firefox + xdotool, 77 моделей                  |
-| 2025-12-31 | PS-19: DNS-Shop - IP banned + Qrator, нет доступа                 |
-| 2025-12-31 | PS-18: Citilink работает! 6 цен MacBook получено                  |
-| 2025-12-31 | PS-17: Деплой на Archbook - i-ray.ru работает!                    |
-| 2025-12-31 | PS-16: Advanced bypass - серверная защита, не обойти              |
-| 2025-12-31 | PS-15: Stealth не обходит Citilink/DNS/Kotofoto                   |
-| 2025-12-31 | Stealth scraper: обход защиты regard.ru (144,400)                 |
-| 2025-12-31 | Найден i-ray.ru: 107,999 RUB, В наличии, verified                 |
-| 2025-12-31 | find_macbook_price.py: верификация товара (5 checks)              |
-| 2025-12-31 | Скрипты поиска MacBook по артикулу Z14V0008D                      |
-| 2025-12-31 | Добавлена интеграция 2Captcha (PS-9)                              |
-| 2025-12-31 | Тесты Playwright: DNS (401), Citilink (CAPTCHA)                   |
-| 2025-12-31 | Создан test_search.py - DuckDuckGo работает                       |
-| 2025-12-31 | Создан LEARNING_PATH.md - путь обучения                           |
-| 2025-12-31 | PS-1 заблокирован: e-katalog.ru недоступен                        |
-| 2025-12-31 | Создан дашборд проекта                                            |
-| 2025-12-31 | Начальная документация проекта                                    |
+| Дата       | Изменение                                                          |
+|------------|--------------------------------------------------------------------|
+| 2026-01-11 | PS-49 fix: Auto-refresh mv_product_popularity in worker (1h)       |
+| 2026-01-11 | PS-49: Price Display Fix - removed /100 in bot, *100 in AliExpress |
+| 2026-01-08 | PS-48: Web Search Filtering - category URLs, relevance, stemming   |
+| 2026-01-08 | PS-47: Smart Price Alerts - auto-subscribe, currency analysis      |
+| 2026-01-08 | PS-46 Phase 4: Store Auto-Cleanup - daily timer, health functions  |
+| 2026-01-08 | PS-46 Phase 3: Arbitrage Analytics - SQL functions, migration 008  |
+| 2026-01-08 | PS-46 Phase 2: Auto-Import - store_discovery.py, web_search track  |
+| 2026-01-08 | PS-46 Phase 1: CRUD API - migrations, stores endpoint, health      |
+| 2026-01-08 | PS-45: Web Search Price Extraction - Playwright + DuckDuckGo       |
+| 2026-01-07 | PS-44: Currency Auto-Collection - systemd timer daily 12:00 MSK    |
+| 2026-01-07 | PS-43: Bot UX - inline keyboards for all messages, product lists   |
+| 2026-01-07 | PS-42: Analytics - /stats command, command logging, daily reports  |
+| 2026-01-07 | fix: STDDEV type mismatch in get_price_trends (::float8 cast)      |
+| 2026-01-07 | fix: ML predictor SQL (CTE), venv/bin/python, currency_rates       |
+| 2026-01-06 | PS-40: Bot Localization - all UI strings translated to Russian     |
+| 2026-01-06 | PS-30: Bot Notifications - auto-analytics, command footer hints    |
+| 2026-01-06 | Project cleanup: reports moved to docs/reports/, debug files del   |
+| 2026-01-06 | PS-39: Market Research - Top 100, discovery, /top, /web commands   |
+| 2026-01-06 | PS-8: Telegram Bot - teloxide, 10 commands, standalone mode        |
+| 2026-01-05 | PS-38: ML Price Predictions - Random Forest 7-day forecasts        |
+| 2026-01-05 | PS-37: Arbitrage Detector - Price differences across stores        |
+| 2026-01-05 | PS-36: Analytics Dashboard - 6 endpoints (trends, correlation)     |
+| 2026-01-05 | PS-35: Automated Scheduled Scraping - 10-minute intervals          |
+| 2026-01-05 | PS-34: Currency Rates Tracking - Dual sources (CBR + open.er)      |
+| 2026-01-05 | PS-33: AliExpress Russia added - 9th store with fallback parser    |
+| 2026-01-05 | PS-28: API Server - Axum REST API (13 endpoints, analytics ready)  |
+| 2026-01-04 | PS-29: Scraper Orchestration - Queue + Worker (1,770 lines)        |
+| 2026-01-04 | PS-23: Python Bridge - Rust-Python subprocess communication        |
+| 2026-01-04 | PS-22: Rust workspace initialized - 5 crates compiled              |
+| 2026-01-04 | PS-21: PostgreSQL schema created - 7 tables, 9 stores              |
+| 2026-01-03 | Citilink rate limiting исправлен! Задержки 90-210s, 24.4s          |
+| 2026-01-03 | Avito работает! Исправлен парсер, 9/9 магазинов, 51,799 RUB        |
+| 2026-01-02 | Ozon добавлен! 75,024 RUB через Firefox, 8/9 магазинов             |
+| 2026-01-02 | Yandex Market добавлен! 287,891 RUB, 7/8 магазинов работают        |
+| 2026-01-02 | ALL TESTS PASSED! 6/6 unified test, все методы работают            |
+| 2026-01-02 | test_scrapers.py: citilink_special + firefox xvfb fix              |
+| 2026-01-02 | Citilink работает! Playwright + delay, 10 моделей                  |
+| 2026-01-02 | Добавлен nix.ru (129,563 RUB), 7/7 магазинов работают              |
+| 2026-01-02 | DNS-Shop работает! Firefox + xdotool, 77 моделей                   |
+| 2025-12-31 | PS-19: DNS-Shop - IP banned + Qrator, нет доступа                  |
+| 2025-12-31 | PS-18: Citilink работает! 6 цен MacBook получено                   |
+| 2025-12-31 | PS-17: Деплой на Archbook - i-ray.ru работает!                     |
+| 2025-12-31 | PS-16: Advanced bypass - серверная защита, не обойти               |
+| 2025-12-31 | PS-15: Stealth не обходит Citilink/DNS/Kotofoto                    |
+| 2025-12-31 | Stealth scraper: обход защиты regard.ru (144,400)                  |
+| 2025-12-31 | Найден i-ray.ru: 107,999 RUB, В наличии, verified                  |
+| 2025-12-31 | find_macbook_price.py: верификация товара (5 checks)               |
+| 2025-12-31 | Скрипты поиска MacBook по артикулу Z14V0008D                       |
+| 2025-12-31 | Добавлена интеграция 2Captcha (PS-9)                               |
+| 2025-12-31 | Тесты Playwright: DNS (401), Citilink (CAPTCHA)                    |
+| 2025-12-31 | Создан test_search.py - DuckDuckGo работает                        |
+| 2025-12-31 | Создан LEARNING_PATH.md - путь обучения                            |
+| 2025-12-31 | PS-1 заблокирован: e-katalog.ru недоступен                         |
+| 2025-12-31 | Создан дашборд проекта                                             |
+| 2025-12-31 | Начальная документация проекта                                     |
 
 ---
 

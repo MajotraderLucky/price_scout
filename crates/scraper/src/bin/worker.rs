@@ -66,6 +66,7 @@ async fn main() -> Result<()> {
 
     info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     info!("✅ Worker ready - polling for jobs every 10 minutes");
+    info!("✅ Materialized view refresh: every 1 hour");
     info!("Press Ctrl+C to stop");
     info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
@@ -76,6 +77,20 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Spawn materialized view refresh task (every hour)
+    let db_refresh = db.clone();
+    let refresh_handle = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(3600)); // 1 hour
+        loop {
+            interval.tick().await;
+            info!("🔄 Refreshing materialized views...");
+            match db_refresh.refresh_popularity_metrics().await {
+                Ok(()) => info!("✅ mv_product_popularity refreshed"),
+                Err(e) => error!("Failed to refresh mv_product_popularity: {}", e),
+            }
+        }
+    });
+
     // Wait for shutdown signal
     signal::ctrl_c()
         .await
@@ -83,6 +98,10 @@ async fn main() -> Result<()> {
 
     info!("📡 Shutdown signal received, stopping worker...");
     shutdown_handle.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    // Abort refresh task
+    refresh_handle.abort();
+    info!("✅ Materialized view refresh task stopped");
 
     // Wait for worker to finish (with timeout)
     match tokio::time::timeout(Duration::from_secs(30), worker_handle).await {
