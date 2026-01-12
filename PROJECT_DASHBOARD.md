@@ -1,6 +1,6 @@
 # Price Scout - Project Dashboard
 
-> Последнее обновление: 2026-01-11 (PS-49 Complete + /top fix)
+> Последнее обновление: 2026-01-12 (PS-50 Wishlist Complete)
 
 ---
 
@@ -27,6 +27,7 @@
 
 | ID    | Задача                                 | Дата       | Результат                                         |
 |-------|----------------------------------------|------------|---------------------------------------------------|
+| PS-50 | Wishlist (Отложенные покупки)          | 2026-01-12 | /wishlist, /wish commands, priority, target price |
 | PS-49 | Исправление отображения цен            | 2026-01-11 | Убрано /100 в боте, *100 в AliExpress парсере     |
 | PS-48 | Фильтрация веб-поиска                  | 2026-01-08 | Category URL filter, relevance check, RU stemming |
 | PS-47 | Умные ценовые алерты                   | 2026-01-08 | Auto-subscribe, currency analysis, Telegram notif |
@@ -72,6 +73,7 @@
 | Документ           | Описание                                    | Путь                                                                   |
 |--------------------|---------------------------------------------|------------------------------------------------------------------------|
 | README             | Обзор проекта                               | [README.md](README.md)                                                 |
+| PS-50 Plan         | План: Wishlist (Отложенные покупки)         | [~/.claude/plans/joyful-stirring-matsumoto.md]                         |
 | PS-49 Plan         | План: Исправление отображения цен           | [~/.claude/plans/curious-floating-lecun.md]                            |
 | Market Analysis    | План развития: Анализ рынка и торговля      | [~/.claude/plans/cheerful-bubbling-catmull.md]                         |
 | Learning Path      | Путь обучения парсингу                      | [docs/LEARNING_PATH.md]                                                |

@@ -29,6 +29,9 @@ use anyhow::{Context, Result};
 use price_scout_db::Database;
 use price_scout_models::{Product, ProductPopularity, StorePrice, Store};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use teloxide::{
     dispatching::{Dispatcher, UpdateFilterExt},
     dptree,
@@ -70,7 +73,7 @@ struct WebSearchResponse {
 }
 
 /// Single web search result
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct WebSearchResult {
     title: String,
     url: String,
@@ -78,6 +81,66 @@ struct WebSearchResult {
     shop: Option<String>,
     snippet: String,
     prices: Vec<i64>,
+}
+
+/// Cached web search results for tracking feature
+struct CachedWebSearch {
+    query: String,
+    results: Vec<WebSearchResult>,
+    expires_at: Instant,
+}
+
+/// Global cache for web search results (TTL: 10 minutes)
+static WEB_SEARCH_CACHE: Mutex<Option<HashMap<String, CachedWebSearch>>> = Mutex::new(None);
+
+/// Cache TTL in seconds
+const WEB_SEARCH_CACHE_TTL: u64 = 600; // 10 minutes
+
+/// Generate short hash for cache key
+fn generate_cache_key(query: &str) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    query.to_lowercase().hash(&mut hasher);
+    format!("{:x}", hasher.finish() & 0xFFFFFF) // 6 hex chars
+}
+
+/// Cache web search results
+fn cache_web_search(query: &str, results: Vec<WebSearchResult>) -> String {
+    let key = generate_cache_key(query);
+    let cached = CachedWebSearch {
+        query: query.to_string(),
+        results,
+        expires_at: Instant::now() + Duration::from_secs(WEB_SEARCH_CACHE_TTL),
+    };
+
+    let mut cache = WEB_SEARCH_CACHE.lock().unwrap();
+    if cache.is_none() {
+        *cache = Some(HashMap::new());
+    }
+
+    if let Some(ref mut map) = *cache {
+        // Clean expired entries
+        map.retain(|_, v| v.expires_at > Instant::now());
+        map.insert(key.clone(), cached);
+    }
+
+    key
+}
+
+/// Get cached web search result by key and index
+fn get_cached_result(key: &str, index: usize) -> Option<(String, WebSearchResult)> {
+    let cache = WEB_SEARCH_CACHE.lock().unwrap();
+    if let Some(ref map) = *cache {
+        if let Some(cached) = map.get(key) {
+            if cached.expires_at > Instant::now() {
+                if let Some(result) = cached.results.get(index) {
+                    return Some((cached.query.clone(), result.clone()));
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Bot commands
@@ -183,6 +246,32 @@ fn products_list_keyboard(products: &[Product], action: &str) -> InlineKeyboardM
         .chunks(2)
         .map(|chunk| chunk.to_vec())
         .collect();
+
+    InlineKeyboardMarkup::new(rows)
+}
+
+/// Клавиатура для результатов веб-поиска с кнопками отслеживания
+fn web_results_keyboard(results: &[WebSearchResult], cache_key: &str) -> InlineKeyboardMarkup {
+    let mut rows: Vec<Vec<InlineKeyboardButton>> = Vec::new();
+
+    // Add track button for each result with price (max 5)
+    for (i, result) in results.iter().take(5).enumerate() {
+        if !result.prices.is_empty() {
+            let shop = result.shop.as_deref().unwrap_or(&result.domain);
+            // Truncate shop name to fit button
+            let shop_short: String = shop.chars().take(15).collect();
+            let label = format!("[+] {}", shop_short);
+            let callback = format!("wt_{}_{}", i, cache_key);
+            rows.push(vec![InlineKeyboardButton::callback(label, callback)]);
+        }
+    }
+
+    // Add quick commands row at the bottom
+    rows.push(vec![
+        InlineKeyboardButton::callback("📊 Цены", "cmd_price"),
+        InlineKeyboardButton::callback("📈 Тренды", "cmd_trends"),
+        InlineKeyboardButton::callback("💰 Арбитраж", "cmd_arb"),
+    ]);
 
     InlineKeyboardMarkup::new(rows)
 }
@@ -567,6 +656,66 @@ async fn handle_callback(bot: Bot, q: CallbackQuery, db: Database) -> ResponseRe
                 }
             }
         }
+        // Web search track callbacks (PS-53)
+        _ if data.starts_with("wt_") => {
+            if let Some(uid) = user_id {
+                log_command_async(&db, Some(uid), "web_track", Some(data)).await;
+                // Parse: wt_{index}_{cache_key}
+                let parts: Vec<&str> = data.split('_').collect();
+                if parts.len() >= 3 {
+                    if let Ok(index) = parts[1].parse::<usize>() {
+                        let cache_key = parts[2];
+                        if let Some((query, result)) = get_cached_result(cache_key, index) {
+                            // Get minimum price from result
+                            let price = result.prices.iter().min().copied();
+                            let store_name = result.shop.as_deref().unwrap_or(&result.domain);
+
+                            // Create product from web result
+                            match db.create_product_from_web(&query, &result.url, price.map(|p| p as i32), store_name).await {
+                                Ok(product_id) => {
+                                    // Add to wishlist
+                                    match db.add_to_wishlist(uid, product_id, 2, price.map(|p| p as i32), None).await {
+                                        Ok(_) => {
+                                            let msg = format!(
+                                                "[+] Товар добавлен в отслеживание!\n\n<b>{}</b>\n💰 {} ₽\n🏪 {}\n\n/wishlist - посмотреть список",
+                                                query,
+                                                price.unwrap_or(0),
+                                                store_name
+                                            );
+                                            bot.send_message(chat_id, msg)
+                                                .parse_mode(ParseMode::Html)
+                                                .await?;
+                                        }
+                                        Err(e) => {
+                                            // Might already be in wishlist
+                                            if e.to_string().contains("duplicate") || e.to_string().contains("unique") {
+                                                bot.send_message(chat_id, "[i] Товар уже в списке отслеживания")
+                                                    .await?;
+                                            } else {
+                                                error!("Failed to add to wishlist: {:#}", e);
+                                                bot.send_message(chat_id, "[X] Ошибка добавления в список")
+                                                    .await?;
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Failed to create product from web: {:#}", e);
+                                    bot.send_message(chat_id, "[X] Ошибка создания товара")
+                                        .await?;
+                                }
+                            }
+                        } else {
+                            bot.send_message(chat_id, "[!] Результаты поиска устарели. Повторите поиск.")
+                                .await?;
+                        }
+                    }
+                }
+            } else {
+                bot.send_message(chat_id, "[X] Сначала используйте /start")
+                    .await?;
+            }
+        }
         // Wishlist callbacks (PS-50)
         _ if data.starts_with("wl_") => {
             if let Some(uid) = user_id {
@@ -655,19 +804,26 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
 
     match db.search_products(&text).await {
         Ok(products) => {
+            info!("DB search returned {} products for '{}'", products.len(), text);
             match products.len() {
                 0 => {
                     // Product not found in DB - try web search
+                    info!("No products in DB, starting web search...");
                     bot.send_message(chat_id, "😕 Товар не найден в БД. Ищу в интернете...")
                         .await?;
 
                     match call_web_search(&text, 15).await {
                         Ok(results) => {
+                            info!("Web search returned {} results", results.results.len());
+                            // Cache results for tracking feature
+                            let cache_key = cache_web_search(&text, results.results.clone());
                             let response = format_web_search_results(&results);
+                            info!("Sending response with tracking keyboard...");
                             bot.send_message(chat_id, response)
                                 .parse_mode(ParseMode::Html)
-                                .reply_markup(quick_commands_keyboard())
+                                .reply_markup(web_results_keyboard(&results.results, &cache_key))
                                 .await?;
+                            info!("Response sent successfully with tracking keyboard");
                         }
                         Err(e) => {
                             error!("Web search fallback failed: {:#}", e);
@@ -679,6 +835,7 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
                 }
                 1 => {
                     // Found exactly one product - show full info from DB
+                    info!("Found 1 product in DB, showing full info...");
                     let product = &products[0];
                     show_full_product_info(&bot, chat_id, product, &db).await?;
 
@@ -688,11 +845,15 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
 
                     match call_web_search(&text, 15).await {
                         Ok(results) => {
+                            info!("Web search returned {} results", results.results.len());
+                            // Cache results for tracking feature
+                            let cache_key = cache_web_search(&text, results.results.clone());
                             let response = format_web_search_results(&results);
                             bot.send_message(chat_id, response)
                                 .parse_mode(ParseMode::Html)
-                                .reply_markup(quick_commands_keyboard())
+                                .reply_markup(web_results_keyboard(&results.results, &cache_key))
                                 .await?;
+                            info!("Web results sent with tracking keyboard");
                         }
                         Err(e) => {
                             error!("Web search failed: {:#}", e);
@@ -702,11 +863,13 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
                 }
                 _ => {
                     // Multiple products - show list with selection keyboard
+                    info!("Found {} products in DB, showing list with keyboard", products.len());
                     let response = format_search_results(&products);
                     bot.send_message(chat_id, response)
                         .parse_mode(ParseMode::Html)
                         .reply_markup(products_list_keyboard(&products, "price"))
                         .await?;
+                    info!("Products list sent with keyboard");
                 }
             }
         }
@@ -1710,7 +1873,7 @@ fn format_web_search_results(response: &WebSearchResponse) -> String {
         }
     }
 
-    msg.push_str(format_command_hints_footer());
+    // Note: inline keyboard buttons are added via reply_markup in the handler
     msg
 }
 

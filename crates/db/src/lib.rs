@@ -321,6 +321,63 @@ impl Database {
         Ok(id)
     }
 
+    /// Create product from web search result (PS-53)
+    ///
+    /// Creates a product and optionally adds initial price from the web search.
+    /// Used when user clicks "Track" button on web search results.
+    pub async fn create_product_from_web(
+        &self,
+        name: &str,
+        url: &str,
+        price: Option<i32>,  // in kopecks (already converted from rubles)
+        store_name: &str,
+    ) -> Result<i64> {
+        // 1. Create product
+        let product_id = self.create_product(
+            name,
+            None,  // category unknown from web
+            &serde_json::json!({"source": "web_search", "url": url}),
+            Some(name),  // use name as search_query for future lookups
+        ).await?;
+
+        // 2. Find or create store by name/domain
+        let store_id = if let Some(store) = self.find_store_by_domain(store_name).await? {
+            store.id
+        } else if let Some(store) = self.get_store_by_name(store_name).await? {
+            store.id
+        } else {
+            // Create new store
+            self.create_store(&NewStore {
+                name: store_name.to_string(),
+                base_url: url.split('/').take(3).collect::<Vec<_>>().join("/"),
+                method: "manual".to_string(),
+                parser: "none".to_string(),
+                unstable: true,  // web-discovered stores are unstable
+                source: "web_search".to_string(),
+                priority: 100,   // low priority
+            }).await?
+        };
+
+        // 3. Add initial price if provided
+        if let Some(price_kopecks) = price {
+            let store_price = StorePrice {
+                id: 0,  // will be assigned by DB
+                product_id,
+                store_id,
+                price: price_kopecks,
+                url: Some(url.to_string()),
+                available: true,
+                scraped_at: chrono::Utc::now(),
+            };
+            if let Err(e) = self.upsert_store_price(&store_price).await {
+                // Log but don't fail - product was created
+                tracing::warn!("Failed to add initial price for web product: {}", e);
+            }
+        }
+
+        Ok(product_id)
+    }
+
     /// Get product by ID
     pub async fn get_product(&self, id: i64) -> Result<Option<Product>> {
         let product = sqlx::query_as::<_, Product>("SELECT * FROM products WHERE id = $1")
@@ -2344,5 +2401,301 @@ impl Database {
         .context("Failed to get cheapest store")?;
 
         Ok(result)
+    }
+}
+
+// ============================================================================
+// WISHLIST OPERATIONS (PS-50)
+// ============================================================================
+
+impl Database {
+    /// Add product to user's wishlist
+    ///
+    /// If target_price is set, automatically creates a price alert.
+    ///
+    /// # Arguments
+    /// * `user_id` - User's database ID
+    /// * `product_id` - Product to add
+    /// * `priority` - 1=high, 2=medium, 3=low
+    /// * `target_price` - Optional target price in kopecks
+    /// * `notes` - Optional user notes
+    ///
+    /// # Returns
+    /// Wishlist item ID
+    pub async fn add_to_wishlist(
+        &self,
+        user_id: i64,
+        product_id: i64,
+        priority: i16,
+        target_price: Option<i32>,
+        notes: Option<&str>,
+    ) -> Result<i64> {
+        let id = sqlx::query_scalar::<_, i64>(
+            "SELECT add_to_wishlist($1, $2, $3, $4, $5)",
+        )
+        .bind(user_id)
+        .bind(product_id)
+        .bind(priority)
+        .bind(target_price)
+        .bind(notes)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to add to wishlist")?;
+
+        Ok(id)
+    }
+
+    /// Remove product from user's wishlist
+    ///
+    /// Also disables any associated price alert.
+    pub async fn remove_from_wishlist(
+        &self,
+        user_id: i64,
+        product_id: i64,
+    ) -> Result<bool> {
+        // First, disable associated alert
+        sqlx::query(
+            r#"
+            UPDATE user_price_alerts
+            SET enabled = false, updated_at = NOW()
+            WHERE user_id = $1 AND product_id = $2 AND source = 'wishlist'
+            "#,
+        )
+        .bind(user_id)
+        .bind(product_id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to disable wishlist alert")?;
+
+        // Then remove from wishlist
+        let result = sqlx::query(
+            "DELETE FROM user_wishlist WHERE user_id = $1 AND product_id = $2",
+        )
+        .bind(user_id)
+        .bind(product_id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to remove from wishlist")?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Get user's wishlist with filtering and sorting
+    ///
+    /// # Arguments
+    /// * `user_id` - User's database ID
+    /// * `include_purchased` - Include purchased items
+    /// * `priority_filter` - Optional priority filter (1, 2, or 3)
+    ///
+    /// # Returns
+    /// Wishlist items sorted by priority (high first), then by created_at
+    pub async fn get_user_wishlist(
+        &self,
+        user_id: i64,
+        include_purchased: bool,
+        priority_filter: Option<i16>,
+    ) -> Result<Vec<WishlistItemWithProduct>> {
+        let items = if let Some(priority) = priority_filter {
+            sqlx::query_as::<_, WishlistItemWithProduct>(
+                r#"
+                SELECT * FROM v_user_wishlist
+                WHERE user_id = $1
+                  AND ($2 OR purchased = false)
+                  AND priority = $3
+                ORDER BY priority ASC, created_at DESC
+                "#,
+            )
+            .bind(user_id)
+            .bind(include_purchased)
+            .bind(priority)
+            .fetch_all(&self.pool)
+            .await
+        } else {
+            sqlx::query_as::<_, WishlistItemWithProduct>(
+                r#"
+                SELECT * FROM v_user_wishlist
+                WHERE user_id = $1
+                  AND ($2 OR purchased = false)
+                ORDER BY priority ASC, created_at DESC
+                "#,
+            )
+            .bind(user_id)
+            .bind(include_purchased)
+            .fetch_all(&self.pool)
+            .await
+        };
+
+        items.context("Failed to fetch user wishlist")
+    }
+
+    /// Get single wishlist item by ID
+    pub async fn get_wishlist_item(
+        &self,
+        wishlist_id: i64,
+    ) -> Result<Option<WishlistItemWithProduct>> {
+        let item = sqlx::query_as::<_, WishlistItemWithProduct>(
+            "SELECT * FROM v_user_wishlist WHERE wishlist_id = $1",
+        )
+        .bind(wishlist_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to fetch wishlist item")?;
+
+        Ok(item)
+    }
+
+    /// Get wishlist item by user and product
+    pub async fn get_wishlist_by_product(
+        &self,
+        user_id: i64,
+        product_id: i64,
+    ) -> Result<Option<WishlistItemWithProduct>> {
+        let item = sqlx::query_as::<_, WishlistItemWithProduct>(
+            "SELECT * FROM v_user_wishlist WHERE user_id = $1 AND product_id = $2",
+        )
+        .bind(user_id)
+        .bind(product_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to fetch wishlist item by product")?;
+
+        Ok(item)
+    }
+
+    /// Update wishlist item priority
+    pub async fn update_wishlist_priority(
+        &self,
+        wishlist_id: i64,
+        priority: i16,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE user_wishlist
+            SET priority = $2, updated_at = NOW()
+            WHERE id = $1
+            "#,
+        )
+        .bind(wishlist_id)
+        .bind(priority)
+        .execute(&self.pool)
+        .await
+        .context("Failed to update wishlist priority")?;
+
+        Ok(())
+    }
+
+    /// Set target price for wishlist item
+    ///
+    /// Uses database function that handles alert creation/update.
+    pub async fn set_wishlist_target_price(
+        &self,
+        user_id: i64,
+        wishlist_id: i64,
+        target_price: Option<i32>,
+    ) -> Result<()> {
+        sqlx::query("SELECT set_wishlist_target_price($1, $2, $3)")
+            .bind(user_id)
+            .bind(wishlist_id)
+            .bind(target_price)
+            .execute(&self.pool)
+            .await
+            .context("Failed to set wishlist target price")?;
+
+        Ok(())
+    }
+
+    /// Mark wishlist item as purchased
+    pub async fn mark_wishlist_purchased(
+        &self,
+        wishlist_id: i64,
+        price: i32,
+        store: &str,
+    ) -> Result<()> {
+        sqlx::query("SELECT mark_wishlist_purchased($1, $2, $3)")
+            .bind(wishlist_id)
+            .bind(price)
+            .bind(store)
+            .execute(&self.pool)
+            .await
+            .context("Failed to mark as purchased")?;
+
+        Ok(())
+    }
+
+    /// Get wishlist statistics for user
+    pub async fn get_wishlist_stats(&self, user_id: i64) -> Result<WishlistStats> {
+        let stats = sqlx::query_as::<_, WishlistStats>(
+            "SELECT * FROM get_wishlist_stats($1)",
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to fetch wishlist stats")?;
+
+        Ok(stats)
+    }
+
+    /// Check if product is in user's wishlist
+    pub async fn is_in_wishlist(
+        &self,
+        user_id: i64,
+        product_id: i64,
+    ) -> Result<bool> {
+        let exists = sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM user_wishlist
+                WHERE user_id = $1 AND product_id = $2 AND NOT purchased
+            )
+            "#,
+        )
+        .bind(user_id)
+        .bind(product_id)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to check wishlist")?;
+
+        Ok(exists)
+    }
+
+    /// Get purchase history (bought items)
+    pub async fn get_purchase_history(
+        &self,
+        user_id: i64,
+        limit: i32,
+    ) -> Result<Vec<WishlistItemWithProduct>> {
+        let items = sqlx::query_as::<_, WishlistItemWithProduct>(
+            r#"
+            SELECT * FROM v_user_wishlist
+            WHERE user_id = $1 AND purchased = true
+            ORDER BY purchased_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch purchase history")?;
+
+        Ok(items)
+    }
+
+    /// Check if price alert is from wishlist source
+    pub async fn is_wishlist_alert(&self, alert_id: i64) -> Result<bool> {
+        let is_wishlist = sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM user_price_alerts
+                WHERE id = $1 AND source = 'wishlist'
+            )
+            "#,
+        )
+        .bind(alert_id)
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to check if wishlist alert")?;
+
+        Ok(is_wishlist)
     }
 }

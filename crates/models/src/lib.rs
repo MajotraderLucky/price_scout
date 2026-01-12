@@ -824,6 +824,179 @@ pub struct PriceAlertLog {
 }
 
 // ============================================================================
+// WISHLIST MODELS (PS-50)
+// ============================================================================
+
+/// Wishlist item priority
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WishlistPriority {
+    High = 1,
+    Medium = 2,
+    Low = 3,
+}
+
+impl WishlistPriority {
+    pub fn from_i16(val: i16) -> Self {
+        match val {
+            1 => Self::High,
+            3 => Self::Low,
+            _ => Self::Medium,
+        }
+    }
+
+    pub fn as_i16(&self) -> i16 {
+        *self as i16
+    }
+
+    /// ASCII symbol for priority display
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            Self::High => "[!!!]",
+            Self::Medium => "[!!]",
+            Self::Low => "[!]",
+        }
+    }
+
+    /// Russian label
+    pub fn label_ru(&self) -> &'static str {
+        match self {
+            Self::High => "Высокий",
+            Self::Medium => "Средний",
+            Self::Low => "Низкий",
+        }
+    }
+}
+
+impl Default for WishlistPriority {
+    fn default() -> Self {
+        Self::Medium
+    }
+}
+
+/// User wishlist item
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct WishlistItem {
+    pub id: i64,
+    pub user_id: i64,
+    pub product_id: i64,
+    pub priority: i16,
+    pub target_price: Option<i32>,
+    pub notes: Option<String>,
+    pub purchased: bool,
+    pub purchased_at: Option<DateTime<Utc>>,
+    pub purchased_price: Option<i32>,
+    pub purchased_store: Option<String>,
+    pub alert_id: Option<i64>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl WishlistItem {
+    pub fn priority_enum(&self) -> WishlistPriority {
+        WishlistPriority::from_i16(self.priority)
+    }
+
+    /// Target price in rubles
+    pub fn target_price_rub(&self) -> Option<f64> {
+        self.target_price.map(|p| p as f64 / 100.0)
+    }
+
+    /// Purchased price in rubles
+    pub fn purchased_price_rub(&self) -> Option<f64> {
+        self.purchased_price.map(|p| p as f64 / 100.0)
+    }
+}
+
+/// Wishlist item with product info (from JOIN or view)
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct WishlistItemWithProduct {
+    pub wishlist_id: i64,
+    pub user_id: i64,
+    pub product_id: i64,
+    pub product_name: String,
+    pub category: Option<String>,
+    pub priority: i16,
+    pub target_price: Option<i32>,
+    pub notes: Option<String>,
+    pub purchased: bool,
+    pub purchased_at: Option<DateTime<Utc>>,
+    pub purchased_price: Option<i32>,
+    pub purchased_store: Option<String>,
+    pub current_price: Option<i32>,
+    pub alert_id: Option<i64>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl WishlistItemWithProduct {
+    pub fn priority_enum(&self) -> WishlistPriority {
+        WishlistPriority::from_i16(self.priority)
+    }
+
+    /// Current price in rubles
+    pub fn current_price_rub(&self) -> Option<f64> {
+        self.current_price.map(|p| p as f64 / 100.0)
+    }
+
+    /// Target price in rubles
+    pub fn target_price_rub(&self) -> Option<f64> {
+        self.target_price.map(|p| p as f64 / 100.0)
+    }
+
+    /// Purchased price in rubles
+    pub fn purchased_price_rub(&self) -> Option<f64> {
+        self.purchased_price.map(|p| p as f64 / 100.0)
+    }
+
+    /// Check if target price is reached
+    pub fn is_target_reached(&self) -> bool {
+        match (self.current_price, self.target_price) {
+            (Some(current), Some(target)) => current <= target,
+            _ => false,
+        }
+    }
+
+    /// Potential savings if target price is reached (in kopecks)
+    pub fn potential_savings(&self) -> Option<i32> {
+        match (self.current_price, self.target_price) {
+            (Some(current), Some(target)) if current > target => Some(current - target),
+            _ => None,
+        }
+    }
+
+    /// Potential savings in rubles
+    pub fn potential_savings_rub(&self) -> Option<f64> {
+        self.potential_savings().map(|s| s as f64 / 100.0)
+    }
+}
+
+/// Wishlist statistics
+#[derive(Debug, Clone, Default, Serialize, Deserialize, FromRow)]
+pub struct WishlistStats {
+    pub total_items: i64,
+    pub active_items: i64,
+    pub purchased_items: i64,
+    pub high_priority: i64,
+    pub medium_priority: i64,
+    pub low_priority: i64,
+    pub total_spent: i64,     // kopecks
+    pub total_saved: i64,     // kopecks (target - purchased)
+}
+
+impl WishlistStats {
+    /// Total spent in rubles
+    pub fn total_spent_rub(&self) -> f64 {
+        self.total_spent as f64 / 100.0
+    }
+
+    /// Total saved in rubles
+    pub fn total_saved_rub(&self) -> f64 {
+        self.total_saved as f64 / 100.0
+    }
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
