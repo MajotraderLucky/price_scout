@@ -1587,8 +1587,8 @@ fn format_search_results(products: &[Product]) -> String {
         response.push_str(&format!("\n<i>... и ещё {} результатов</i>\n", products.len() - 10));
     }
 
-    response.push_str("\n💡 <i>/price &lt;id&gt; - посмотреть цены</i>");
-    response.push_str(format_command_hints_footer());
+    response.push_str("\n💡 <i>Нажмите на товар для просмотра цен</i>");
+    // Note: inline keyboard buttons are added via reply_markup in the handler
 
     response
 }

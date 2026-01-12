@@ -350,10 +350,10 @@ impl Database {
             self.create_store(&NewStore {
                 name: store_name.to_string(),
                 base_url: url.split('/').take(3).collect::<Vec<_>>().join("/"),
-                method: "manual".to_string(),
+                method: "generic_http".to_string(),  // valid: firefox, playwright_*, generic_*
                 parser: "none".to_string(),
                 unstable: true,  // web-discovered stores are unstable
-                source: "web_search".to_string(),
+                source: "manual".to_string(),        // valid: migration, manual, auto_import
                 priority: 100,   // low priority
             }).await?
         };
