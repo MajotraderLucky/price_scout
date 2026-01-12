@@ -23,6 +23,7 @@
 
 mod notifications;
 mod price_alerts;
+mod wishlist;
 
 use anyhow::{Context, Result};
 use price_scout_db::Database;
@@ -105,6 +106,10 @@ enum Command {
     Top(String),
     #[command(description = "Статистика бота: /stats [период]")]
     Stats(String),
+    #[command(description = "Список желаний: /wishlist")]
+    Wishlist,
+    #[command(description = "Управление wishlist: /wish <add|remove|bought|target> <id> [цена]")]
+    Wish(String),
 }
 
 // ============================================================================
@@ -142,14 +147,17 @@ fn quick_commands_keyboard() -> InlineKeyboardMarkup {
 fn product_keyboard(product_id: i64) -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![
         vec![
-            InlineKeyboardButton::callback("💰 Цены", format!("price_{}", product_id)),
-            InlineKeyboardButton::callback("📈 Тренды", format!("trends_{}", product_id)),
-            InlineKeyboardButton::callback("🔮 Прогноз", format!("predict_{}", product_id)),
+            InlineKeyboardButton::callback("Цены", format!("price_{}", product_id)),
+            InlineKeyboardButton::callback("Тренды", format!("trends_{}", product_id)),
+            InlineKeyboardButton::callback("Прогноз", format!("predict_{}", product_id)),
         ],
         vec![
-            InlineKeyboardButton::callback("💸 Арбитраж", "cmd_arb"),
-            InlineKeyboardButton::callback("🏆 Топ", "cmd_top"),
-            InlineKeyboardButton::callback("📊 Статистика", "cmd_stats"),
+            InlineKeyboardButton::callback("[+] Wishlist", format!("wl_add_{}", product_id)),
+        ],
+        vec![
+            InlineKeyboardButton::callback("Арбитраж", "cmd_arb"),
+            InlineKeyboardButton::callback("Топ", "cmd_top"),
+            InlineKeyboardButton::callback("Статистика", "cmd_stats"),
         ],
     ])
 }
@@ -559,6 +567,28 @@ async fn handle_callback(bot: Bot, q: CallbackQuery, db: Database) -> ResponseRe
                 }
             }
         }
+        // Wishlist callbacks (PS-50)
+        _ if data.starts_with("wl_") => {
+            if let Some(uid) = user_id {
+                log_command_async(&db, Some(uid), "wishlist_callback", Some(data)).await;
+                match wishlist::handle_wishlist_callback(&bot, chat_id, &db, uid, data).await {
+                    Ok(true) => {
+                        // Callback handled successfully
+                    }
+                    Ok(false) => {
+                        warn!("Unhandled wishlist callback: {}", data);
+                    }
+                    Err(e) => {
+                        error!("Failed to handle wishlist callback: {:#}", e);
+                        bot.send_message(chat_id, "[X] Ошибка обработки. Попробуйте позже.")
+                            .await?;
+                    }
+                }
+            } else {
+                bot.send_message(chat_id, "[X] Сначала используйте /start")
+                    .await?;
+            }
+        }
         _ => {
             warn!("Unknown callback data: {}", data);
         }
@@ -636,11 +666,13 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
                             let response = format_web_search_results(&results);
                             bot.send_message(chat_id, response)
                                 .parse_mode(ParseMode::Html)
+                                .reply_markup(quick_commands_keyboard())
                                 .await?;
                         }
                         Err(e) => {
                             error!("Web search fallback failed: {:#}", e);
                             bot.send_message(chat_id, "😕 Ничего не найдено.")
+                                .reply_markup(quick_commands_keyboard())
                                 .await?;
                         }
                     }
@@ -659,6 +691,7 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
                             let response = format_web_search_results(&results);
                             bot.send_message(chat_id, response)
                                 .parse_mode(ParseMode::Html)
+                                .reply_markup(quick_commands_keyboard())
                                 .await?;
                         }
                         Err(e) => {
@@ -668,10 +701,11 @@ async fn handle_text_message(bot: Bot, msg: Message, db: Database) -> ResponseRe
                     }
                 }
                 _ => {
-                    // Multiple products - show list
+                    // Multiple products - show list with selection keyboard
                     let response = format_search_results(&products);
                     bot.send_message(chat_id, response)
                         .parse_mode(ParseMode::Html)
+                        .reply_markup(products_list_keyboard(&products, "price"))
                         .await?;
                 }
             }
@@ -1180,6 +1214,124 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, db: Database) -> ResponseR
                 Err(e) => {
                     error!("Failed to get stats: {:#}", e);
                     bot.send_message(chat_id, "[X] Ошибка загрузки статистики. Попробуйте позже.")
+                        .await?;
+                }
+            }
+        }
+
+        Command::Wishlist => {
+            log_command_async(&db, user_id, "wishlist", None).await;
+
+            if let Some(telegram_id) = user_id {
+                if let Ok(Some(user)) = db.get_user_by_telegram_id(telegram_id).await {
+                    if let Err(e) = wishlist::handle_wishlist_command(&bot, chat_id, &db, user.id).await {
+                        error!("Failed to handle wishlist command: {:#}", e);
+                        bot.send_message(chat_id, "[X] Ошибка загрузки списка желаний")
+                            .await?;
+                    }
+                } else {
+                    bot.send_message(chat_id, "[X] Сначала используйте /start")
+                        .await?;
+                }
+            }
+        }
+
+        Command::Wish(args) => {
+            log_command_async(&db, user_id, "wish", Some(&args)).await;
+
+            let parts: Vec<&str> = args.split_whitespace().collect();
+            if parts.is_empty() {
+                bot.send_message(
+                    chat_id,
+                    "Использование:\n/wish add <id> [цена] - добавить\n/wish remove <id> - удалить\n/wish bought <id> - куплено\n/wish target <wl_id> <цена> - цель",
+                )
+                .await?;
+                return Ok(());
+            }
+
+            if let Some(telegram_id) = user_id {
+                if let Ok(Some(user)) = db.get_user_by_telegram_id(telegram_id).await {
+                    match parts[0] {
+                        "add" if parts.len() >= 2 => {
+                            if let Ok(product_id) = parts[1].parse::<i64>() {
+                                // Parse price in rubles, convert to kopecks
+                                let target_price = parts.get(2).and_then(|p| {
+                                    p.parse::<i32>().ok().map(|rub| rub * 100)
+                                });
+                                if let Err(e) = wishlist::handle_wish_add(
+                                    &bot, chat_id, &db, user.id, product_id, target_price,
+                                ).await {
+                                    error!("Failed to add to wishlist: {:#}", e);
+                                    bot.send_message(chat_id, "[X] Ошибка добавления в wishlist")
+                                        .await?;
+                                }
+                            } else {
+                                bot.send_message(chat_id, "[X] Неверный ID товара")
+                                    .await?;
+                            }
+                        }
+                        "remove" if parts.len() >= 2 => {
+                            if let Ok(product_id) = parts[1].parse::<i64>() {
+                                if let Err(e) = wishlist::handle_wish_remove(
+                                    &bot, chat_id, &db, user.id, product_id,
+                                ).await {
+                                    error!("Failed to remove from wishlist: {:#}", e);
+                                    bot.send_message(chat_id, "[X] Ошибка удаления из wishlist")
+                                        .await?;
+                                }
+                            } else {
+                                bot.send_message(chat_id, "[X] Неверный ID товара")
+                                    .await?;
+                            }
+                        }
+                        "bought" if parts.len() >= 2 => {
+                            if let Ok(product_id) = parts[1].parse::<i64>() {
+                                if let Err(e) = wishlist::handle_wish_bought(
+                                    &bot, chat_id, &db, user.id, product_id,
+                                ).await {
+                                    error!("Failed to mark as bought: {:#}", e);
+                                    bot.send_message(chat_id, "[X] Ошибка отметки покупки")
+                                        .await?;
+                                }
+                            } else {
+                                bot.send_message(chat_id, "[X] Неверный ID товара")
+                                    .await?;
+                            }
+                        }
+                        "target" if parts.len() >= 3 => {
+                            if let (Ok(wishlist_id), Ok(price_rub)) =
+                                (parts[1].parse::<i64>(), parts[2].parse::<i32>())
+                            {
+                                let price_kopecks = price_rub * 100;
+                                if let Err(e) = db
+                                    .set_wishlist_target_price(user.id, wishlist_id, Some(price_kopecks))
+                                    .await
+                                {
+                                    error!("Failed to set target price: {:#}", e);
+                                    bot.send_message(chat_id, "[X] Ошибка установки целевой цены")
+                                        .await?;
+                                } else {
+                                    bot.send_message(
+                                        chat_id,
+                                        format!("[+] Целевая цена установлена: {} RUB", price_rub),
+                                    )
+                                    .await?;
+                                }
+                            } else {
+                                bot.send_message(chat_id, "[X] Неверные параметры")
+                                    .await?;
+                            }
+                        }
+                        _ => {
+                            bot.send_message(
+                                chat_id,
+                                "Использование:\n/wish add <id> [цена] - добавить\n/wish remove <id> - удалить\n/wish bought <id> - куплено\n/wish target <wl_id> <цена> - цель",
+                            )
+                            .await?;
+                        }
+                    }
+                } else {
+                    bot.send_message(chat_id, "[X] Сначала используйте /start")
                         .await?;
                 }
             }

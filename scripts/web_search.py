@@ -19,10 +19,13 @@ import re
 from urllib.parse import urlparse
 
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 except ImportError:
-    print(json.dumps({"query": "", "results": [], "error": "duckduckgo-search not installed"}))
-    sys.exit(1)
+    try:
+        from duckduckgo_search import DDGS
+    except ImportError:
+        print(json.dumps({"query": "", "results": [], "error": "ddgs not installed (pip install ddgs)"}))
+        sys.exit(1)
 
 # Try to import store_parsers for real price extraction
 STORE_PARSERS_AVAILABLE = False
@@ -55,6 +58,22 @@ AGGREGATORS = {
     "goods-price.ru",
     "nadavi.ru",
 }
+
+# Sites that are NOT shops - exclude from results
+EXCLUDED_DOMAINS = {
+    # Classifieds (not shops)
+    "avito.ru", "youla.ru",
+    # Reviews/forums/social
+    "pikabu.ru", "vc.ru", "habr.com", "dzen.ru",
+    "reviews.yandex.ru", "irecommend.ru", "otzovik.com",
+    # Reference sites
+    "wikipedia.org", "wikimedia.org",
+    # News/media
+    "rbc.ru", "kommersant.ru", "lenta.ru",
+}
+
+# Allowed TLDs - only Russian sites + .com for international shops
+ALLOWED_TLDS = {".ru", ".com"}
 
 # URL patterns that indicate category/catalog pages (not product pages)
 CATEGORY_PATTERNS = [
@@ -293,10 +312,13 @@ def search_prices(query: str, max_results: int = 20, fetch_real_prices: bool = T
 
     try:
         with DDGS() as ddgs:
-            # Simple search without "купить...цена" - avoids rate limiting
+            # Add "купить" to query for better shop results
+            search_query = f"{query} купить" if "купить" not in query.lower() else query
+            # Search with Russian region for relevant results
             search_results = list(ddgs.text(
-                query,
-                max_results=max_results
+                search_query,
+                max_results=max_results,
+                region='ru-ru'
             ))
 
         for r in search_results:
@@ -310,6 +332,16 @@ def search_prices(query: str, max_results: int = 20, fetch_real_prices: bool = T
             # Skip aggregators and price comparison sites
             is_aggregator = any(agg in domain for agg in AGGREGATORS)
             if is_aggregator:
+                continue
+
+            # Skip excluded domains (classifieds, reviews, forums)
+            is_excluded = any(excl in domain for excl in EXCLUDED_DOMAINS)
+            if is_excluded:
+                continue
+
+            # Skip non-Russian sites (only .ru and .com allowed)
+            tld = '.' + domain.split('.')[-1] if '.' in domain else ''
+            if tld not in ALLOWED_TLDS:
                 continue
 
             # Skip category/catalog pages (PS-48)
