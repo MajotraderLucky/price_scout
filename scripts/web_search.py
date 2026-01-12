@@ -70,6 +70,8 @@ EXCLUDED_DOMAINS = {
     "wikipedia.org", "wikimedia.org",
     # News/media
     "rbc.ru", "kommersant.ru", "lenta.ru",
+    # Ad/redirect domains
+    "bing.com", "google.com",
 }
 
 # Allowed TLDs - only Russian sites + .com for international shops
@@ -88,6 +90,7 @@ CATEGORY_PATTERNS = [
     '/search/',
     '/search?',
     '/brands/',
+    '/popular/',  # AliExpress category pages
 ]
 
 # Russian stop words for relevance checking
